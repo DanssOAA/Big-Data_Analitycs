@@ -1,5 +1,9 @@
 ﻿@import "tailwindcss";
 
+/* =========================================================
+   TEMA LIGHT - PREDETERMINADO
+   ========================================================= */
+
 :root {
   font-family:
     Inter,
@@ -10,11 +14,45 @@
     "Segoe UI",
     sans-serif;
 
-  color: #f5f7fa;
-  background: #07090d;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  color-scheme: light;
+
+  --background: #f5f6f8;
+  --sidebar: #ffffff;
+
+  --surface: #ffffff;
+  --surface-hover: #f8f9fb;
+  --surface-elevated: #f2f4f7;
+
+  --border: #d7dce5;
+  --border-soft: #e7eaf0;
+
+  --text-primary: #171a21;
+  --text-secondary: #475467;
+  --text-muted: #7b8494;
+
+  --accent: #6d5dfc;
+  --accent-hover: #5d4bea;
+  --accent-soft: rgba(109, 93, 252, 0.10);
+
+  --success: #12a675;
+  --warning: #d49515;
+  --danger: #e34f6f;
+
+  --topbar: rgba(245, 246, 248, 0.88);
+
+  --chart-grid: #e6e9ef;
+}
+
+
+/* =========================================================
+   TEMA DARK
+   ========================================================= */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 
   --background: #07090d;
   --sidebar: #0a0d12;
@@ -37,7 +75,16 @@
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #fb7185;
+
+  --topbar: rgba(7, 9, 13, 0.88);
+
+  --chart-grid: #1b212b;
 }
+
+
+/* =========================================================
+   BASE
+   ========================================================= */
 
 * {
   box-sizing: border-box;
@@ -51,8 +98,13 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+
   background: var(--background);
   color: var(--text-primary);
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 button,
@@ -71,10 +123,38 @@ a {
   text-decoration: none;
 }
 
+input,
+textarea,
+select {
+  color-scheme: inherit;
+}
+
 ::selection {
   background: var(--accent);
-  color: white;
+  color: #ffffff;
 }
+
+
+/* =========================================================
+   COMPATIBILIDAD CON COMPONENTES ACTUALES
+   ========================================================= */
+
+html[data-theme="light"] .text-white {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] [class*="bg-[var(--accent)]"] {
+  color: #ffffff !important;
+}
+
+html[data-theme="light"] [class*="bg-[var(--accent)]"] .text-white {
+  color: #ffffff !important;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -86,10 +166,18 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #242b36;
+  background: #b9c0ca;
   border-radius: 20px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: #959eaa;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #242b36;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: #303947;
 }

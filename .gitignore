@@ -1,5 +1,5 @@
 ﻿# =========================================================
-# CRM INSIGHTS - GITIGNORE
+# CRM INSIGHTS
 # React + TypeScript + Vite + Supabase
 # =========================================================
 
@@ -12,7 +12,7 @@ node_modules/
 
 
 # ---------------------------------------------------------
-# BUILD / COMPILACION
+# BUILD
 # ---------------------------------------------------------
 
 dist/
@@ -25,7 +25,6 @@ out/
 
 # ---------------------------------------------------------
 # VARIABLES DE ENTORNO
-# NUNCA subir credenciales reales
 # ---------------------------------------------------------
 
 .env
@@ -36,7 +35,7 @@ out/
 
 .env.*
 
-# Permitimos subir el ejemplo
+# Permitir archivo de ejemplo
 !.env.example
 
 
@@ -56,18 +55,18 @@ lerna-debug.log*
 
 
 # ---------------------------------------------------------
+# TYPESCRIPT
+# ---------------------------------------------------------
+
+*.tsbuildinfo
+
+
+# ---------------------------------------------------------
 # TEST / COVERAGE
 # ---------------------------------------------------------
 
 coverage/
 .nyc_output/
-
-
-# ---------------------------------------------------------
-# TYPESCRIPT
-# ---------------------------------------------------------
-
-*.tsbuildinfo
 
 
 # ---------------------------------------------------------
@@ -82,43 +81,36 @@ coverage/
 
 # ---------------------------------------------------------
 # SUPABASE
-#
-# NO ignorar:
-# supabase/migrations/
-# supabase/functions/
-#
-# Esos archivos deben versionarse.
 # ---------------------------------------------------------
 
 .supabase/
 supabase/.temp/
 
-
-# ---------------------------------------------------------
-# EDITORES / IDE
-# ---------------------------------------------------------
-
-.idea/
-
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+# IMPORTANTE:
+# NO ignorar:
+#
+# supabase/migrations/
+# supabase/functions/
+# supabase/config.toml
+#
+# Estos archivos si deben versionarse.
 
 
 # ---------------------------------------------------------
-# SISTEMA OPERATIVO
+# DATOS LOCALES / DATASETS PRIVADOS
 # ---------------------------------------------------------
 
-.DS_Store
-.AppleDouble
-.LSOverride
+data/private/
+data/uploads/
 
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-Desktop.ini
+uploads/
+exports/
+temp/
+tmp/
 
-$RECYCLE.BIN/
+*.private.csv
+*.private.xlsx
+*.private.xls
 
 
 # ---------------------------------------------------------
@@ -136,38 +128,73 @@ $RECYCLE.BIN/
 
 
 # ---------------------------------------------------------
-# ARCHIVOS LOCALES DE DATOS
-#
-# Los CSV utilizados para pruebas reales pueden contener
-# informacion empresarial y no deben subirse por defecto.
-# ---------------------------------------------------------
-
-data/private/
-data/uploads/
-uploads/
-
-*.private.csv
-
-
-# ---------------------------------------------------------
-# CERTIFICADOS / CLAVES
+# CERTIFICADOS / SECRETOS
 # ---------------------------------------------------------
 
 *.pem
 *.key
 *.pfx
 *.p12
-*.crt
 
-certificates/
 secrets/
+certificates/
 
 
 # ---------------------------------------------------------
-# OTROS
+# VISUAL STUDIO CODE
+# ---------------------------------------------------------
+
+.vscode/*
+
+!.vscode/extensions.json
+!.vscode/settings.json
+
+
+# ---------------------------------------------------------
+# JETBRAINS
+# ---------------------------------------------------------
+
+.idea/
+
+
+# ---------------------------------------------------------
+# VISUAL STUDIO
+# ---------------------------------------------------------
+
+.vs/
+
+
+# ---------------------------------------------------------
+# WINDOWS
+# ---------------------------------------------------------
+
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+$RECYCLE.BIN/
+
+
+# ---------------------------------------------------------
+# MACOS
+# ---------------------------------------------------------
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+
+# ---------------------------------------------------------
+# DEPLOYMENT
 # ---------------------------------------------------------
 
 .vercel/
 .netlify/
+
+
+# ---------------------------------------------------------
+# OTROS ARCHIVOS LOCALES
+# ---------------------------------------------------------
 
 *.local

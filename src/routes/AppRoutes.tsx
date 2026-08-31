@@ -21,7 +21,6 @@ import ShipmentsPage from '../pages/crm/ShipmentsPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
 
 import DatasetDetailPage from '../pages/insights/DatasetDetailPage'
-import GenerateInsightPage from '../pages/insights/GenerateInsightPage'
 import InsightDetailPage from '../pages/insights/InsightDetailPage'
 import InsightsExplorerPage from '../pages/insights/InsightsExplorerPage'
 
@@ -214,15 +213,6 @@ export default function AppRoutes() {
           element={
             <WorkerRoute>
               <WorkerInsightsPage />
-            </WorkerRoute>
-          }
-        />
-
-        <Route
-          path="insights/nuevo"
-          element={
-            <WorkerRoute>
-              <GenerateInsightPage />
             </WorkerRoute>
           }
         />

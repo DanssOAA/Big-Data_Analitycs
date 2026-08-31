@@ -2,7 +2,6 @@ import {
   ArrowUpRight,
   CalendarDays,
   Sparkles,
-  Wand2,
 } from 'lucide-react'
 
 import {
@@ -30,11 +29,10 @@ export default function WorkerInsightsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Sin filtro: las politicas RLS ya limitan lo que vuelve
-        // segun el rol (publicados + los que el propio usuario
-        // genero).
         const result =
-          await listInsights()
+          await listInsights({
+            onlyPublished: true,
+          })
 
         setInsights(result)
       } finally {
@@ -47,7 +45,7 @@ export default function WorkerInsightsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <section>
         <div>
           <p className="text-sm font-medium text-[var(--accent)]">
             Inteligencia
@@ -56,18 +54,9 @@ export default function WorkerInsightsPage() {
             Insights Estratégicos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-            Consulta los análisis publicados por el administrador o genera los
-            tuyos propios comparando un dataset contra tus ventas registradas.
+            Consulta los análisis estratégicos que el administrador publicó para el equipo.
           </p>
         </div>
-
-        <Link
-          to="/app/insights/nuevo"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)]"
-        >
-          <Wand2 size={17} />
-          Generar analisis
-        </Link>
       </section>
 
       {loading ? (
@@ -87,7 +76,7 @@ export default function WorkerInsightsPage() {
           </p>
 
           <p className="mx-auto mt-2 max-w-md text-sm text-[var(--text-muted)]">
-            Genera tu primer analisis o espera a que el administrador publique uno.
+            Cuando el administrador publique un análisis, aparecerá aquí automáticamente.
           </p>
         </div>
       ) : (

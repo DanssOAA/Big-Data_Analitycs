@@ -104,12 +104,21 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleSecretAccess}
-              className="inline-flex select-none items-center gap-2.5 text-2xl font-semibold tracking-tight text-white"
+              className="inline-flex min-h-14 select-none items-center gap-3 rounded-2xl border border-white/80 bg-white px-5 py-3 text-xl font-semibold tracking-tight text-[#4a3aad] shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/95 hover:shadow-2xl"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur lg:hidden">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
                 <BarChart3 size={18} />
               </span>
-              Kargia
+
+              <span className="text-left">
+                <span className="block leading-none">
+                  Kargia
+                </span>
+
+                <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#746b9b]">
+                  Portal de acceso
+                </span>
+              </span>
             </button>
 
             {adminAccess && (

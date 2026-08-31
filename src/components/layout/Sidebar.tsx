@@ -10,7 +10,6 @@ import {
   Sparkles,
   Truck,
   Users,
-  Wand2,
   X,
 } from 'lucide-react'
 
@@ -77,11 +76,6 @@ const workerItems: MenuItem[] = [
     path: '/app/insights',
     icon: Sparkles,
     end: true,
-  },
-  {
-    label: 'Generar analisis',
-    path: '/app/insights/nuevo',
-    icon: Wand2,
   },
 ]
 

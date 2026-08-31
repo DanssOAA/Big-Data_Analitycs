@@ -14,6 +14,8 @@ import {
   type FormEvent,
 } from 'react'
 
+import { useAuth } from '../../context/AuthContext'
+
 import type {
   ClientStatus,
   CrmClient,
@@ -41,6 +43,8 @@ export default function ClientDetailModal({
   onSave,
   onDelete,
 }: ClientDetailModalProps) {
+  const { isAdmin } = useAuth()
+
   const [draft, setDraft] = useState<CrmClient>(client)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -279,27 +283,31 @@ export default function ClientDetailModal({
 
         <footer className="flex items-center justify-between gap-3 border-t border-[var(--border-soft)] p-5">
           <div>
-            <button
-              type="button"
-              disabled={
-                salesCount > 0 ||
-                deleting
-              }
-              onClick={() =>
-                void handleDelete()
-              }
-              className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Trash2 size={16} />
-              {deleting
-                ? 'Eliminando...'
-                : 'Eliminar'}
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  disabled={
+                    salesCount > 0 ||
+                    deleting
+                  }
+                  onClick={() =>
+                    void handleDelete()
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 size={16} />
+                  {deleting
+                    ? 'Eliminando...'
+                    : 'Eliminar'}
+                </button>
 
-            {salesCount > 0 && (
-              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
-                No se puede eliminar porque tiene ventas asociadas.
-              </p>
+                {salesCount > 0 && (
+                  <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                    No se puede eliminar porque tiene ventas asociadas.
+                  </p>
+                )}
+              </>
             )}
           </div>
 

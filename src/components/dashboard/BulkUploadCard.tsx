@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   FileUp,
   LoaderCircle,
+  Sparkles,
   UploadCloud,
 } from 'lucide-react'
 
@@ -15,6 +16,15 @@ import { Link } from 'react-router'
 
 import { uploadDataset } from '../../services/datasetStorage.service'
 
+import {
+  detectShipmentColumns,
+  importShipmentsFromTable,
+} from '../../services/shipmentsStorage.service'
+
+import type { DatasetTable } from '../../types/dataset.types'
+
+import DangerZoneMenu from './DangerZoneMenu'
+
 export default function BulkUploadCard() {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -23,6 +33,23 @@ export default function BulkUploadCard() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [lastDatasetId, setLastDatasetId] = useState('')
+
+  const [
+    shipmentTable,
+    setShipmentTable,
+  ] = useState<DatasetTable | null>(
+    null,
+  )
+
+  const [
+    importing,
+    setImporting,
+  ] = useState(false)
+
+  const [
+    importMessage,
+    setImportMessage,
+  ] = useState('')
 
   const processFiles = async (
     files: FileList | File[],
@@ -37,10 +64,14 @@ export default function BulkUploadCard() {
     setMessage('')
     setError('')
     setLastDatasetId('')
+    setShipmentTable(null)
+    setImportMessage('')
 
     const created: string[] = []
     const failed: string[] = []
     let createdId = ''
+    let matchedTable: DatasetTable | null =
+      null
 
     for (const file of selectedFiles) {
       try {
@@ -49,6 +80,16 @@ export default function BulkUploadCard() {
 
         created.push(file.name)
         createdId = dataset.id
+
+        if (!matchedTable) {
+          matchedTable =
+            dataset.tables.find(
+              (table) =>
+                detectShipmentColumns(
+                  table,
+                ) !== null,
+            ) ?? null
+        }
       } catch (exception) {
         const description =
           exception instanceof Error
@@ -69,6 +110,7 @@ export default function BulkUploadCard() {
       )
 
       setLastDatasetId(createdId)
+      setShipmentTable(matchedTable)
     }
 
     if (failed.length > 0) {
@@ -81,6 +123,40 @@ export default function BulkUploadCard() {
       inputRef.current.value = ''
     }
   }
+
+  const handleImportShipments =
+    async () => {
+      if (!shipmentTable) {
+        return
+      }
+
+      setImporting(true)
+      setImportMessage('')
+
+      try {
+        const result =
+          await importShipmentsFromTable(
+            shipmentTable,
+          )
+
+        setImportMessage(
+          `${result.imported.toLocaleString('es-PE')} envios importados` +
+            (result.clientsCreated > 0
+              ? ` (${result.clientsCreated} clientes nuevos creados).`
+              : '.'),
+        )
+
+        setShipmentTable(null)
+      } catch (exception) {
+        setError(
+          exception instanceof Error
+            ? exception.message
+            : 'No se pudo importar el archivo como envios.',
+        )
+      } finally {
+        setImporting(false)
+      }
+    }
 
   const handleDrop = (
     event: DragEvent<HTMLDivElement>,
@@ -119,32 +195,36 @@ export default function BulkUploadCard() {
             </p>
 
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Sube un archivo CSV o Excel para analizarlo con IA.
+              Sube un archivo CSV o Excel para analizarlo con IA, o para llenar tus modulos con datos reales.
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          disabled={processing}
-          onClick={() =>
-            inputRef.current?.click()
-          }
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {processing ? (
-            <LoaderCircle
-              size={17}
-              className="animate-spin"
-            />
-          ) : (
-            <FileUp size={17} />
-          )}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() =>
+              inputRef.current?.click()
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {processing ? (
+              <LoaderCircle
+                size={17}
+                className="animate-spin"
+              />
+            ) : (
+              <FileUp size={17} />
+            )}
 
-          {processing
-            ? 'Procesando...'
-            : 'Seleccionar archivo'}
-        </button>
+            {processing
+              ? 'Procesando...'
+              : 'Seleccionar archivo'}
+          </button>
+
+          <DangerZoneMenu />
+        </div>
       </div>
 
       <div
@@ -182,6 +262,47 @@ export default function BulkUploadCard() {
               <ArrowUpRight size={14} />
             </Link>
           )}
+        </div>
+      )}
+
+      {shipmentTable && (
+        <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-primary)] sm:flex-row sm:items-center">
+          <span>
+            Este archivo tiene forma de historico de envios (
+            {shipmentTable.rows.length.toLocaleString(
+              'es-PE',
+            )}{' '}
+            filas). Puedes llenar el modulo de Envios con estos
+            datos reales.
+          </span>
+
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() =>
+              void handleImportShipments()
+            }
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {importing ? (
+              <LoaderCircle
+                size={14}
+                className="animate-spin"
+              />
+            ) : (
+              <Sparkles size={14} />
+            )}
+
+            {importing
+              ? 'Importando...'
+              : 'Importar como Envios'}
+          </button>
+        </div>
+      )}
+
+      {importMessage && (
+        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
+          {importMessage}
         </div>
       )}
 

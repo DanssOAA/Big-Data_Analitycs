@@ -11,6 +11,8 @@ import {
   type FormEvent,
 } from 'react'
 
+import { useAuth } from '../../context/AuthContext'
+
 import { getClients } from '../../services/crmStorage.service'
 
 import {
@@ -84,6 +86,8 @@ const statusStyles: Record<
 }
 
 export default function ShipmentsPage() {
+  const { isAdmin } = useAuth()
+
   const [
     shipments,
     setShipments,
@@ -400,19 +404,21 @@ export default function ShipmentsPage() {
                         </td>
 
                         <td className="px-5 py-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void removeShipment(
-                                shipment,
-                              )
-                            }
-                            className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-rose-500/10 hover:text-rose-500"
-                          >
-                            <X
-                              size={14}
-                            />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void removeShipment(
+                                  shipment,
+                                )
+                              }
+                              className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-rose-500/10 hover:text-rose-500"
+                            >
+                              <X
+                                size={14}
+                              />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )

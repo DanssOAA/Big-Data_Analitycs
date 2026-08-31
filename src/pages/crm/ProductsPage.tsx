@@ -12,6 +12,8 @@ import {
   type FormEvent,
 } from 'react'
 
+import { useAuth } from '../../context/AuthContext'
+
 import {
   deleteProduct,
   getProducts,
@@ -45,6 +47,8 @@ function emptyForm(): ProductForm {
 }
 
 export default function ProductsPage() {
+  const { isAdmin } = useAuth()
+
   const [
     products,
     setProducts,
@@ -360,19 +364,21 @@ export default function ProductsPage() {
                       </td>
 
                       <td className="px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void removeProduct(
-                              product,
-                            )
-                          }
-                          className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-rose-500/10 hover:text-rose-500"
-                        >
-                          <X
-                            size={14}
-                          />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void removeProduct(
+                                product,
+                              )
+                            }
+                            className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-rose-500/10 hover:text-rose-500"
+                          >
+                            <X
+                              size={14}
+                            />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ),

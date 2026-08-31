@@ -6,11 +6,16 @@ import {
 } from 'react'
 
 import {
+  BarChart3,
+  Lock,
+  Mail,
   ShieldCheck,
   X,
 } from 'lucide-react'
 
 import { useNavigate } from 'react-router'
+
+import LoginShowcase from '../../components/auth/LoginShowcase'
 
 import { useAuth } from '../../context/AuthContext'
 
@@ -90,107 +95,110 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <button
-            type="button"
-            onClick={handleSecretAccess}
-            className="select-none text-2xl font-semibold tracking-tight text-[var(--text-primary)]"
-          >
-            Kargia
-          </button>
+    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      <LoginShowcase />
 
-          {adminAccess && (
-            <div className="mt-4 flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
-                <ShieldCheck size={14} />
-
-                Modo Administrador
-
-                <button
-                  type="button"
-                  onClick={disableAdminMode}
-                  className="ml-1 rounded-full p-0.5"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div
-          className={`rounded-2xl border bg-[var(--surface)] p-6 shadow-sm transition ${
-            adminAccess
-              ? 'border-[var(--accent)]'
-              : 'border-[var(--border)]'
-          }`}
-        >
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-            Iniciar sesion
-          </h2>
-
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {adminAccess
-              ? 'Acceso administrativo habilitado.'
-              : 'Ingresa tus credenciales corporativas para continuar.'}
-          </p>
-
-          <form
-            onSubmit={handleSubmit}
-            className="mt-6 space-y-4"
-          >
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-                Correo
+      <div className="flex items-center justify-center bg-gradient-to-br from-[var(--accent)] to-[#4a3aad] px-4 py-12">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 text-center">
+            <button
+              type="button"
+              onClick={handleSecretAccess}
+              className="inline-flex select-none items-center gap-2.5 text-2xl font-semibold tracking-tight text-white"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur lg:hidden">
+                <BarChart3 size={18} />
               </span>
+              Kargia
+            </button>
 
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
-                placeholder="correo@empresa.com"
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
-              />
-            </label>
+            {adminAccess && (
+              <div className="mt-4 flex justify-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
+                  <ShieldCheck size={14} />
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-                Contrasena
-              </span>
+                  Modo Administrador
 
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(event) =>
-                  setPassword(event.target.value)
-                }
-                placeholder="Contrasena"
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
-              />
-            </label>
-
-            {error && (
-              <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-500">
-                {error}
+                  <button
+                    type="button"
+                    onClick={disableAdminMode}
+                    className="ml-1 rounded-full p-0.5"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               </div>
             )}
+          </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          <div className="rounded-3xl bg-white/10 p-7 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <h2 className="text-2xl font-semibold text-white">
+              Bienvenido de nuevo
+            </h2>
+
+            <p className="mt-1.5 text-sm text-white/70">
+              {adminAccess
+                ? 'Acceso administrativo habilitado.'
+                : 'Ingresa tus credenciales corporativas para continuar.'}
+            </p>
+
+            <form
+              onSubmit={handleSubmit}
+              className="mt-7 space-y-3.5"
             >
-              {submitting
-                ? 'Ingresando...'
-                : 'Ingresar'}
-            </button>
-          </form>
+              <label className="relative block">
+                <Mail
+                  size={17}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/50"
+                />
+
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  placeholder="Correo"
+                  className="w-full rounded-full border border-white/15 bg-white/95 py-3.5 pl-11 pr-4 text-sm text-[#1a1530] outline-none placeholder:text-[#8b87a3] focus:border-white"
+                />
+              </label>
+
+              <label className="relative block">
+                <Lock
+                  size={17}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/50"
+                />
+
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  placeholder="Contrasena"
+                  className="w-full rounded-full border border-white/15 bg-white/95 py-3.5 pl-11 pr-4 text-sm text-[#1a1530] outline-none placeholder:text-[#8b87a3] focus:border-white"
+                />
+              </label>
+
+              {error && (
+                <div className="rounded-2xl border border-rose-300/40 bg-rose-500/20 px-4 py-2.5 text-sm text-white">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-full bg-white py-3.5 text-sm font-semibold text-[var(--accent)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting
+                  ? 'Ingresando...'
+                  : 'Ingresar'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

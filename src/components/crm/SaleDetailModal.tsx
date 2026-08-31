@@ -13,6 +13,8 @@ import {
   type FormEvent,
 } from 'react'
 
+import { useAuth } from '../../context/AuthContext'
+
 import type {
   CrmClient,
   CrmSale,
@@ -42,6 +44,8 @@ export default function SaleDetailModal({
   onSave,
   onDelete,
 }: SaleDetailModalProps) {
+  const { isAdmin } = useAuth()
+
   const [draft, setDraft] = useState<CrmSale>(sale)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -325,21 +329,29 @@ export default function SaleDetailModal({
           </form>
         </div>
 
-        <footer className="flex items-center justify-between gap-3 border-t border-[var(--border-soft)] p-5">
-          <button
-            type="button"
-            disabled={deleting}
-            onClick={() =>
-              void handleDelete()
-            }
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:opacity-50"
-          >
-            <Trash2 size={16} />
+        <footer
+          className={`flex items-center gap-3 border-t border-[var(--border-soft)] p-5 ${
+            isAdmin
+              ? 'justify-between'
+              : 'justify-end'
+          }`}
+        >
+          {isAdmin && (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() =>
+                void handleDelete()
+              }
+              className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-500 transition hover:bg-rose-500/10 disabled:opacity-50"
+            >
+              <Trash2 size={16} />
 
-            {deleting
-              ? 'Eliminando...'
-              : 'Eliminar'}
-          </button>
+              {deleting
+                ? 'Eliminando...'
+                : 'Eliminar'}
+            </button>
+          )}
 
           <button
             type="submit"

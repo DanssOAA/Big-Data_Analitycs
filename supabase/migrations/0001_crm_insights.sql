@@ -22,29 +22,13 @@ as $$
 $$;
 
 -- ---------------------------------------------------------
--- 1. clients / sales: asegurar RLS + politicas
---    (cualquier usuario autenticado puede gestionar el CRM,
---    igual que hacia el mock anterior)
+-- 1. clients / sales
+--    (los permisos reales se definen en la Seccion 10, al final
+--    del archivo, junto con activities/products/shipments)
 -- ---------------------------------------------------------
 
 alter table public.clients enable row level security;
 alter table public.sales enable row level security;
-
-drop policy if exists "authenticated_all_clients" on public.clients;
-create policy "authenticated_all_clients"
-  on public.clients
-  for all
-  to authenticated
-  using (true)
-  with check (true);
-
-drop policy if exists "authenticated_all_sales" on public.sales;
-create policy "authenticated_all_sales"
-  on public.sales
-  for all
-  to authenticated
-  using (true)
-  with check (true);
 
 -- ---------------------------------------------------------
 -- 2. activities (nueva)
@@ -60,14 +44,6 @@ create table if not exists public.activities (
 );
 
 alter table public.activities enable row level security;
-
-drop policy if exists "authenticated_all_activities" on public.activities;
-create policy "authenticated_all_activities"
-  on public.activities
-  for all
-  to authenticated
-  using (true)
-  with check (true);
 
 -- ---------------------------------------------------------
 -- 3. datasets: columna source_type (mis datos / competencia)
@@ -342,14 +318,6 @@ create table if not exists public.products (
 
 alter table public.products enable row level security;
 
-drop policy if exists "authenticated_all_products" on public.products;
-create policy "authenticated_all_products"
-  on public.products
-  for all
-  to authenticated
-  using (true)
-  with check (true);
-
 -- ---------------------------------------------------------
 -- 8. shipments (envios / logistica)
 --    Modulo operativo independiente de ventas: alimenta futuros
@@ -376,14 +344,6 @@ create table if not exists public.shipments (
 
 alter table public.shipments enable row level security;
 
-drop policy if exists "authenticated_all_shipments" on public.shipments;
-create policy "authenticated_all_shipments"
-  on public.shipments
-  for all
-  to authenticated
-  using (true)
-  with check (true);
-
 -- ---------------------------------------------------------
 -- 9. Storage: bucket "datasets" solo accesible por admin
 -- ---------------------------------------------------------
@@ -395,3 +355,88 @@ create policy "admin_all_datasets_storage"
   to authenticated
   using (bucket_id = 'datasets' and public.is_admin())
   with check (bucket_id = 'datasets' and public.is_admin());
+
+-- ---------------------------------------------------------
+-- 10. Permisos del CRM operativo (clients, sales, activities,
+--     products, shipments):
+--     - Cualquier usuario autenticado (admin o trabajador) puede
+--       leer, crear y editar.
+--     - Eliminar (delete) queda reservado SOLO al administrador.
+--       El trabajador puede seguir agregando informacion, pero
+--       nunca borrar nada.
+-- ---------------------------------------------------------
+
+do $$
+declare
+  crm_table text;
+begin
+  foreach crm_table in array array[
+    'clients',
+    'sales',
+    'activities',
+    'products',
+    'shipments'
+  ]
+  loop
+    execute format(
+      'alter table public.%I enable row level security',
+      crm_table
+    );
+
+    -- Se eliminan las politicas viejas (de versiones anteriores
+    -- de esta migracion) para evitar choques al reejecutar.
+    execute format(
+      'drop policy if exists %I on public.%I',
+      'authenticated_all_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'drop policy if exists %I on public.%I',
+      'authenticated_read_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'drop policy if exists %I on public.%I',
+      'authenticated_insert_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'drop policy if exists %I on public.%I',
+      'authenticated_update_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'drop policy if exists %I on public.%I',
+      'admin_delete_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'create policy %I on public.%I for select to authenticated using (true)',
+      'authenticated_read_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'create policy %I on public.%I for insert to authenticated with check (true)',
+      'authenticated_insert_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'create policy %I on public.%I for update to authenticated using (true) with check (true)',
+      'authenticated_update_' || crm_table,
+      crm_table
+    );
+
+    execute format(
+      'create policy %I on public.%I for delete to authenticated using (public.is_admin())',
+      'admin_delete_' || crm_table,
+      crm_table
+    );
+  end loop;
+end $$;

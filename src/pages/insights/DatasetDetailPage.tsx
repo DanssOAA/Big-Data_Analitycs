@@ -1,7 +1,9 @@
-﻿import {
+import {
   ArrowLeft,
   BarChart3,
   Columns3,
+  LoaderCircle,
+  Sparkles,
   Table2,
 } from 'lucide-react'
 
@@ -12,6 +14,7 @@ import {
 
 import {
   Link,
+  useNavigate,
   useParams,
 } from 'react-router'
 
@@ -20,8 +23,23 @@ import DatasetGrid from '../../components/insights/DatasetGrid'
 import DatasetSchemaEditor from '../../components/insights/DatasetSchemaEditor'
 
 import {
+  compareCrmVsDataset,
+  compareDatasets,
+  saveInsight,
+} from '../../services/aiInsights.service'
+
+import { getCrmMetricsSnapshot } from '../../services/crmMetrics.service'
+
+import {
+  buildProductBreakdown,
+  summarizeColumn,
+} from '../../services/datasetSummary.service'
+
+import {
   getDataset,
-  saveDataset,
+  getDatasets,
+  updateCell,
+  updateTableColumns,
 } from '../../services/datasetStorage.service'
 
 import type {
@@ -36,9 +54,13 @@ type ViewMode =
   | 'data'
   | 'columns'
 
+const CRM_TARGET = 'crm'
+
 export default function DatasetDetailPage() {
   const { datasetId } =
     useParams()
+
+  const navigate = useNavigate()
 
   const [
     dataset,
@@ -47,6 +69,11 @@ export default function DatasetDetailPage() {
     useState<
       DatasetRecord | null
     >(null)
+
+  const [
+    internalDatasets,
+    setInternalDatasets,
+  ] = useState<DatasetRecord[]>([])
 
   const [
     selectedTableId,
@@ -68,6 +95,21 @@ export default function DatasetDetailPage() {
   ] =
     useState(true)
 
+  const [
+    compareTarget,
+    setCompareTarget,
+  ] = useState(CRM_TARGET)
+
+  const [
+    comparing,
+    setComparing,
+  ] = useState(false)
+
+  const [
+    compareError,
+    setCompareError,
+  ] = useState('')
+
   useEffect(() => {
     const load =
       async () => {
@@ -76,10 +118,11 @@ export default function DatasetDetailPage() {
           return
         }
 
-        const result =
-          await getDataset(
-            datasetId,
-          )
+        const [result, allDatasets] =
+          await Promise.all([
+            getDataset(datasetId),
+            getDatasets(),
+          ])
 
         if (result) {
           setDataset(result)
@@ -89,6 +132,15 @@ export default function DatasetDetailPage() {
               ?.id ?? '',
           )
         }
+
+        setInternalDatasets(
+          allDatasets.filter(
+            (item) =>
+              item.sourceType ===
+                'internal' &&
+              item.id !== datasetId,
+          ),
+        )
 
         setLoading(false)
       }
@@ -140,29 +192,28 @@ export default function DatasetDetailPage() {
         return
       }
 
-      const updated:
-        DatasetRecord = {
-        ...dataset,
-
-        tables:
-          dataset.tables.map(
-            (table) =>
-              table.id ===
-              selectedTable.id
-                ? {
-                    ...table,
-                    columns,
-                  }
-                : table,
-          ),
-      }
-
-      await saveDataset(
-        updated,
+      await updateTableColumns(
+        selectedTable.id,
+        columns,
       )
 
       setDataset(
-        updated,
+        (current) =>
+          current && {
+            ...current,
+
+            tables:
+              current.tables.map(
+                (table) =>
+                  table.id ===
+                  selectedTable.id
+                    ? {
+                        ...table,
+                        columns,
+                      }
+                    : table,
+              ),
+          },
       )
     }
 
@@ -176,48 +227,198 @@ export default function DatasetDetailPage() {
         return
       }
 
-      const updated:
-        DatasetRecord = {
-        ...dataset,
+      setDataset(
+        (current) =>
+          current && {
+            ...current,
 
-        tables:
-          dataset.tables.map(
-            (table) => {
-              if (
-                table.id !==
-                selectedTable.id
-              ) {
-                return table
-              }
+            tables:
+              current.tables.map(
+                (table) => {
+                  if (
+                    table.id !==
+                    selectedTable.id
+                  ) {
+                    return table
+                  }
 
-              return {
-                ...table,
+                  return {
+                    ...table,
 
-                rows:
-                  table.rows.map(
-                    (row) =>
-                      row.__rowId ===
-                      rowId
-                        ? {
-                            ...row,
+                    rows:
+                      table.rows.map(
+                        (row) =>
+                          row.__rowId ===
+                          rowId
+                            ? {
+                                ...row,
+                                [columnKey]:
+                                  value,
+                              }
+                            : row,
+                      ),
+                  }
+                },
+              ),
+          },
+      )
 
-                            [columnKey]:
-                              value,
-                          }
-                        : row,
-                  ),
-              }
-            },
-          ),
+      await updateCell(
+        selectedTable.id,
+        rowId,
+        columnKey,
+        value,
+      )
+    }
+
+  const runComparison =
+    async () => {
+      if (!selectedTable) {
+        return
       }
 
-      setDataset(
-        updated,
-      )
+      setComparing(true)
+      setCompareError('')
 
-      await saveDataset(
-        updated,
-      )
+      try {
+        const crmSnapshot =
+          await getCrmMetricsSnapshot()
+
+        if (
+          compareTarget ===
+          CRM_TARGET
+        ) {
+          const columnSummaries =
+            selectedTable.columns
+              .filter(
+                (column) =>
+                  column.visible !==
+                  false,
+              )
+              .map((column) =>
+                summarizeColumn(
+                  column,
+                  selectedTable.rows.map(
+                    (row) =>
+                      row[
+                        column.key
+                      ],
+                  ),
+                ),
+              )
+              .filter(
+                (
+                  summary,
+                ): summary is NonNullable<
+                  typeof summary
+                > =>
+                  summary !== null,
+              )
+
+          const analysis =
+            await compareCrmVsDataset(
+              {
+                crmSnapshot,
+                datasetName:
+                  dataset.name,
+                tableName:
+                  selectedTable.name,
+                columnSummaries,
+              },
+            )
+
+          const saved =
+            await saveInsight({
+              analysis,
+              comparisonMode:
+                'crm',
+              datasetId:
+                dataset.id,
+              tableId:
+                selectedTable.id,
+              comparedDatasetId:
+                null,
+              crmSnapshot,
+              externalSnapshot:
+                columnSummaries,
+            })
+
+          navigate(
+            `/admin/insights/analisis/${saved.id}`,
+          )
+
+          return
+        }
+
+        const internalDataset =
+          await getDataset(
+            compareTarget,
+          )
+
+        const internalTable =
+          internalDataset
+            ?.tables[0]
+
+        if (
+          !internalDataset ||
+          !internalTable
+        ) {
+          throw new Error(
+            'No se pudo cargar el dataset interno seleccionado.',
+          )
+        }
+
+        const internalBreakdown =
+          buildProductBreakdown(
+            internalTable,
+          )
+
+        const externalBreakdown =
+          buildProductBreakdown(
+            selectedTable,
+          )
+
+        const analysis =
+          await compareDatasets({
+            crmSnapshot,
+            internalName:
+              internalDataset.name,
+            externalName:
+              dataset.name,
+            internalBreakdown,
+            externalBreakdown,
+          })
+
+        const saved =
+          await saveInsight({
+            analysis,
+            comparisonMode:
+              'datasets',
+            datasetId: dataset.id,
+            tableId:
+              selectedTable.id,
+            comparedDatasetId:
+              internalDataset.id,
+            crmSnapshot,
+            externalSnapshot: {
+              internalBreakdown,
+              externalBreakdown,
+            },
+          })
+
+        navigate(
+          `/admin/insights/analisis/${saved.id}`,
+        )
+      } catch (exception) {
+        setCompareError(
+          exception instanceof
+            Error
+            ? exception.message
+            : 'No se pudo generar el analisis.',
+        )
+      } finally {
+        setComparing(false)
+      }
     }
 
   const visibleCount =
@@ -251,10 +452,10 @@ export default function DatasetDetailPage() {
           </h2>
 
           <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {selectedTable?.rows.length.toLocaleString(
-              'es-PE',
-            ) ?? 0}{' '}
-            filas ·{' '}
+            {dataset.truncated
+              ? `Mostrando ${selectedTable?.rows.length.toLocaleString('es-PE') ?? 0} de ${dataset.totalRows.toLocaleString('es-PE')} filas`
+              : `${selectedTable?.rows.length.toLocaleString('es-PE') ?? 0} filas`}{' '}
+            ·{' '}
             {visibleCount}{' '}
             columnas visibles
           </p>
@@ -348,14 +549,112 @@ export default function DatasetDetailPage() {
       {selectedTable &&
         view ===
           'dashboard' && (
-          <DatasetDashboard
-            dataset={
-              dataset
-            }
-            table={
-              selectedTable
-            }
-          />
+          <>
+            <DatasetDashboard
+              dataset={
+                dataset
+              }
+              table={
+                selectedTable
+              }
+            />
+
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+                  <Sparkles
+                    size={18}
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    Analista IA
+                  </p>
+
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Genera un insight comparando este dataset contra tu CRM o contra uno de tus datasets propios.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <select
+                  value={
+                    compareTarget
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setCompareTarget(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] sm:w-80"
+                >
+                  <option
+                    value={
+                      CRM_TARGET
+                    }
+                  >
+                    Mi CRM (ventas registradas)
+                  </option>
+
+                  {internalDatasets.map(
+                    (item) => (
+                      <option
+                        key={
+                          item.id
+                        }
+                        value={
+                          item.id
+                        }
+                      >
+                        {
+                          item.name
+                        }{' '}
+                        (mis datos)
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <button
+                  type="button"
+                  disabled={
+                    comparing
+                  }
+                  onClick={
+                    runComparison
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {comparing ? (
+                    <LoaderCircle
+                      size={16}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <Sparkles
+                      size={16}
+                    />
+                  )}
+
+                  {comparing
+                    ? 'Analizando...'
+                    : 'Comparar con mi CRM y generar Insight'}
+                </button>
+              </div>
+
+              {compareError && (
+                <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">
+                  {compareError}
+                </div>
+              )}
+            </section>
+          </>
         )}
 
       {selectedTable &&

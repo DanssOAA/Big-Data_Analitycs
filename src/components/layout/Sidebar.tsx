@@ -137,7 +137,7 @@ export default function Sidebar({
             </div>
 
             <span className="font-semibold tracking-tight text-[var(--text-primary)]">
-              CRM Insights
+              Kargia
             </span>
           </div>
 

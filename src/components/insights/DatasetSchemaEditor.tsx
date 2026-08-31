@@ -12,6 +12,7 @@ import {
 
 import type {
   DatasetColumn,
+  DatasetColumnRole,
   DatasetColumnType,
 } from '../../types/dataset.types'
 
@@ -45,6 +46,32 @@ const typeOptions: Array<{
   {
     value: 'empty',
     label: 'Vacio',
+  },
+]
+
+const roleOptions: Array<{
+  value: NonNullable<DatasetColumnRole> | ''
+  label: string
+}> = [
+  {
+    value: '',
+    label: 'Ninguno',
+  },
+  {
+    value: 'product',
+    label: 'Producto',
+  },
+  {
+    value: 'amount',
+    label: 'Monto',
+  },
+  {
+    value: 'date',
+    label: 'Fecha',
+  },
+  {
+    value: 'category',
+    label: 'Categoria',
   },
 ]
 
@@ -212,7 +239,7 @@ export default function DatasetSchemaEditor({
       )}
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
-        <div className="grid grid-cols-[minmax(160px,1fr)_minmax(200px,1.3fr)_150px_90px_48px] gap-3 border-b border-[var(--border-soft)] bg-[var(--surface-elevated)] px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        <div className="grid grid-cols-[minmax(160px,1fr)_minmax(200px,1.3fr)_130px_130px_90px_48px] gap-3 border-b border-[var(--border-soft)] bg-[var(--surface-elevated)] px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           <span>
             Original
           </span>
@@ -223,6 +250,10 @@ export default function DatasetSchemaEditor({
 
           <span>
             Tipo
+          </span>
+
+          <span>
+            Rol
           </span>
 
           <span>
@@ -239,7 +270,7 @@ export default function DatasetSchemaEditor({
                 key={
                   column.key
                 }
-                className="grid grid-cols-[minmax(160px,1fr)_minmax(200px,1.3fr)_150px_90px_48px] items-center gap-3 border-b border-[var(--border-soft)] px-4 py-3 last:border-0"
+                className="grid grid-cols-[minmax(160px,1fr)_minmax(200px,1.3fr)_130px_130px_90px_48px] items-center gap-3 border-b border-[var(--border-soft)] px-4 py-3 last:border-0"
               >
                 <div className="min-w-0">
                   <p
@@ -300,6 +331,47 @@ export default function DatasetSchemaEditor({
                   className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                 >
                   {typeOptions.map(
+                    (
+                      option,
+                    ) => (
+                      <option
+                        key={
+                          option.value
+                        }
+                        value={
+                          option.value
+                        }
+                      >
+                        {
+                          option.label
+                        }
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <select
+                  value={
+                    column.role ??
+                    ''
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    updateColumn(
+                      column.key,
+                      {
+                        role:
+                          (event
+                            .target
+                            .value ||
+                            null) as DatasetColumnRole,
+                      },
+                    )
+                  }
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                >
+                  {roleOptions.map(
                     (
                       option,
                     ) => (

@@ -1,7 +1,9 @@
 ﻿import {
+  ArrowUpRight,
   Database,
   FileUp,
   LoaderCircle,
+  Sparkles,
   UploadCloud,
 } from 'lucide-react'
 
@@ -12,20 +14,25 @@ import {
   type DragEvent,
 } from 'react'
 
+import { Link } from 'react-router'
+
 import DatasetCard from '../../components/insights/DatasetCard'
 
-import { parseDatasetFile } from '../../services/datasetParser.service'
+import { listInsights } from '../../services/aiInsights.service'
 
 import {
   deleteDataset,
   getDatasets,
-  saveDataset,
+  setDatasetSourceType,
+  uploadDataset,
 } from '../../services/datasetStorage.service'
 
 import type { DatasetRecord } from '../../types/dataset.types'
+import type { InsightRecord } from '../../types/insight.types'
 
 export default function InsightsExplorerPage() {
   const [datasets, setDatasets] = useState<DatasetRecord[]>([])
+  const [insights, setInsights] = useState<InsightRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -36,8 +43,14 @@ export default function InsightsExplorerPage() {
 
   const loadDatasets = async () => {
     try {
-      const stored = await getDatasets()
+      const [stored, storedInsights] =
+        await Promise.all([
+          getDatasets(),
+          listInsights(),
+        ])
+
       setDatasets(stored)
+      setInsights(storedInsights)
     } catch {
       setError('No se pudieron cargar los datasets guardados.')
     } finally {
@@ -67,9 +80,7 @@ export default function InsightsExplorerPage() {
 
     for (const file of selectedFiles) {
       try {
-        const dataset = await parseDatasetFile(file)
-
-        await saveDataset(dataset)
+        await uploadDataset(file)
 
         created.push(file.name)
       } catch (exception) {
@@ -143,6 +154,41 @@ export default function InsightsExplorerPage() {
     )
 
     setMessage('Dataset eliminado.')
+  }
+
+  const handleToggleSourceType = async (
+    dataset: DatasetRecord,
+  ) => {
+    const nextType =
+      dataset.sourceType ===
+      'internal'
+        ? 'external'
+        : 'internal'
+
+    setDatasets((current) =>
+      current.map((item) =>
+        item.id === dataset.id
+          ? {
+              ...item,
+              sourceType:
+                nextType,
+            }
+          : item,
+      ),
+    )
+
+    try {
+      await setDatasetSourceType(
+        dataset.id,
+        nextType,
+      )
+    } catch {
+      setError(
+        'No se pudo actualizar el tipo de dataset.',
+      )
+
+      await loadDatasets()
+    }
   }
 
   return (
@@ -305,8 +351,87 @@ export default function InsightsExplorerPage() {
                 key={dataset.id}
                 dataset={dataset}
                 onDelete={handleDelete}
+                onToggleSourceType={
+                  handleToggleSourceType
+                }
               />
             ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-center gap-3">
+          <Sparkles
+            size={18}
+            className="text-[var(--accent)]"
+          />
+
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+              Insights generados
+            </h3>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              {insights.length}{' '}
+              {insights.length === 1
+                ? 'analisis generado'
+                : 'analisis generados'}
+            </p>
+          </div>
+        </div>
+
+        {insights.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center text-sm text-[var(--text-muted)]">
+            Todavia no se generaron analisis. Abre un dataset para comparar sus indicadores con el CRM.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
+            {insights.map(
+              (insight) => (
+                <div
+                  key={insight.id}
+                  className="flex items-center justify-between gap-4 border-b border-[var(--border-soft)] p-5 last:border-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                          insight.published
+                            ? 'bg-emerald-400/10 text-emerald-400'
+                            : 'bg-amber-400/10 text-amber-400'
+                        }`}
+                      >
+                        {insight.published
+                          ? 'Publicado'
+                          : 'Borrador'}
+                      </span>
+
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+                        {insight.comparisonMode ===
+                        'datasets'
+                          ? 'Mis datos vs competencia'
+                          : 'Dataset vs CRM'}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                      {insight.title}
+                    </p>
+                  </div>
+
+                  <Link
+                    to={`/admin/insights/analisis/${insight.id}`}
+                    className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--accent)]"
+                  >
+                    Ver
+                    <ArrowUpRight
+                      size={14}
+                    />
+                  </Link>
+                </div>
+              ),
+            )}
           </div>
         )}
       </section>

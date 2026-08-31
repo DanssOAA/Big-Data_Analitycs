@@ -64,7 +64,7 @@ export default function Topbar({
         <div>
           <div className="flex items-center gap-2">
             <p className="text-xs font-medium text-[var(--text-muted)]">
-              CRM Insights
+              Kargia
             </p>
 
             {isAdmin && (

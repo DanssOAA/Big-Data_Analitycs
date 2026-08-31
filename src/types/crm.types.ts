@@ -31,3 +31,12 @@ export interface CrmSale {
   status: SaleStatus
   createdAt: string
 }
+
+export interface CrmActivity {
+  id: string
+  clientId: string | null
+  type: string
+  description: string
+  activityDate: string
+  createdAt: string
+}

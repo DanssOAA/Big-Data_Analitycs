@@ -644,6 +644,7 @@ export async function parseDatasetFile(
     sizeBytes: file.size,
     createdAt:
       new Date().toISOString(),
+    sourceType: 'external',
     tables,
 
     totalRows:

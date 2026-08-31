@@ -1,6 +1,8 @@
 ﻿import {
+  Building2,
   FileSpreadsheet,
   Trash2,
+  UserRoundCheck,
 } from 'lucide-react'
 
 import { Link } from 'react-router'
@@ -11,6 +13,9 @@ interface DatasetCardProps {
   dataset: DatasetRecord
   onDelete: (
     id: string,
+  ) => void
+  onToggleSourceType: (
+    dataset: DatasetRecord,
   ) => void
 }
 
@@ -36,7 +41,12 @@ function formatSize(
 export default function DatasetCard({
   dataset,
   onDelete,
+  onToggleSourceType,
 }: DatasetCardProps) {
+  const isInternal =
+    dataset.sourceType ===
+    'internal'
+
   const previewTable =
     dataset.tables[0]
 
@@ -156,8 +166,8 @@ export default function DatasetCard({
         </div>
       )}
 
-      <div className="flex items-center justify-between px-5 py-4">
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+        <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-[var(--surface-elevated)] px-2.5 py-1 text-[10px] font-semibold uppercase text-[var(--text-secondary)]">
             {dataset.extension}
           </span>
@@ -167,6 +177,35 @@ export default function DatasetCard({
               dataset.sizeBytes,
             )}
           </span>
+
+          <button
+            type="button"
+            onClick={() =>
+              onToggleSourceType(
+                dataset,
+              )
+            }
+            title="Cambiar entre mis datos y competencia"
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
+              isInternal
+                ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
+                : 'bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            {isInternal ? (
+              <UserRoundCheck
+                size={11}
+              />
+            ) : (
+              <Building2
+                size={11}
+              />
+            )}
+
+            {isInternal
+              ? 'Mis datos'
+              : 'Competencia'}
+          </button>
         </div>
 
         <Link

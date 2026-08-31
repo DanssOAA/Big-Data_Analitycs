@@ -1,12 +1,15 @@
-﻿import {
+import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
 
-import type { AuthUser } from '../types/auth.types'
+import { supabase } from '../services/supabaseClient'
+
+import type { AuthUser, UserRole } from '../types/auth.types'
 
 interface LoginResult {
   success: boolean
@@ -15,125 +18,122 @@ interface LoginResult {
 
 interface AuthContextValue {
   user: AuthUser | null
+  loading: boolean
   login: (
     email: string,
     password: string,
-    adminMode: boolean,
-  ) => LoginResult
-  logout: () => void
+  ) => Promise<LoginResult>
+  logout: () => Promise<void>
   isAdmin: boolean
 }
 
-const STORAGE_KEY = 'crm-insights-demo-user'
-
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-const DEMO_WORKER = {
-  email: 'trabajador@crminsights.local',
-  password: 'Trabajador123!',
-}
-
-const DEMO_ADMIN = {
-  email: 'admin@crminsights.local',
-  password: 'Admin123!',
-}
-
-function getStoredUser(): AuthUser | null {
-  try {
-    const stored = sessionStorage.getItem(STORAGE_KEY)
-
-    if (!stored) {
-      return null
-    }
-
-    return JSON.parse(stored) as AuthUser
-  } catch {
+function mapUser(
+  supabaseUser: {
+    id: string
+    email?: string | null
+    user_metadata?: Record<string, unknown>
+  } | null | undefined,
+): AuthUser | null {
+  if (!supabaseUser) {
     return null
   }
+
+  const metadata = supabaseUser.user_metadata ?? {}
+
+  const role =
+    metadata.role === 'admin'
+      ? 'admin'
+      : ('worker' as UserRole)
+
+  const name =
+    typeof metadata.full_name === 'string' &&
+    metadata.full_name.trim() !== ''
+      ? metadata.full_name
+      : (supabaseUser.email ?? 'Usuario')
+
+  return {
+    id: supabaseUser.id,
+    name,
+    email: supabaseUser.email ?? '',
+    role,
+  }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(getStoredUser)
-
-  const login = (
-    email: string,
-    password: string,
-    adminMode: boolean,
-  ): LoginResult => {
-    const normalizedEmail = email.trim().toLowerCase()
-
-    if (adminMode) {
-      if (
-        normalizedEmail !== DEMO_ADMIN.email ||
-        password !== DEMO_ADMIN.password
-      ) {
-        return {
-          success: false,
-          message: 'Credenciales de administrador incorrectas.',
-        }
-      }
-
-      const adminUser: AuthUser = {
-        id: 'admin-001',
-        name: 'Administrador',
-        email: DEMO_ADMIN.email,
-        role: 'admin',
-      }
-
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(adminUser),
-      )
-
-      setUser(adminUser)
-
-      return {
-        success: true,
-      }
-    }
-
-    if (
-      normalizedEmail !== DEMO_WORKER.email ||
-      password !== DEMO_WORKER.password
-    ) {
-      return {
-        success: false,
-        message: 'Correo o contraseña incorrectos.',
-      }
-    }
-
-    const workerUser: AuthUser = {
-      id: 'worker-001',
-      name: 'Trabajador',
-      email: DEMO_WORKER.email,
-      role: 'worker',
-    }
-
-    sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(workerUser),
-    )
-
-    setUser(workerUser)
-
-    return {
-      success: true,
-    }
+function translateAuthError(message: string) {
+  if (
+    message
+      .toLowerCase()
+      .includes('invalid login credentials')
+  ) {
+    return 'Correo o contraseña incorrectos.'
   }
 
-  const logout = () => {
-    sessionStorage.removeItem(STORAGE_KEY)
+  return message
+}
+
+export function AuthProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const { data: listener } =
+      supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setUser(mapUser(session?.user))
+          setLoading(false)
+        },
+      )
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<LoginResult> => {
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      })
+
+    if (error || !data.user) {
+      return {
+        success: false,
+        message: translateAuthError(
+          error?.message ??
+            'No se pudo iniciar sesion.',
+        ),
+      }
+    }
+
+    setUser(mapUser(data.user))
+
+    return { success: true }
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
   }
 
   const value = useMemo(
     () => ({
       user,
+      loading,
       login,
       logout,
       isAdmin: user?.role === 'admin',
     }),
-    [user],
+    [user, loading],
   )
 
   return (

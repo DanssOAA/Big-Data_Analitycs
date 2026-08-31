@@ -19,16 +19,31 @@ import SalesPage from '../pages/crm/SalesPage'
 import DashboardPage from '../pages/dashboard/DashboardPage'
 
 import DatasetDetailPage from '../pages/insights/DatasetDetailPage'
+import InsightDetailPage from '../pages/insights/InsightDetailPage'
 import InsightsExplorerPage from '../pages/insights/InsightsExplorerPage'
 
 import WorkerInsightsPage from '../pages/worker/WorkerInsightsPage'
+
+function FullScreenLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+      <p className="text-sm text-[var(--text-muted)]">
+        Cargando sesion...
+      </p>
+    </div>
+  )
+}
 
 function ProtectedRoute({
   children,
 }: {
   children: ReactNode
 }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <FullScreenLoader />
+  }
 
   if (!user) {
     return (
@@ -47,7 +62,11 @@ function AdminRoute({
 }: {
   children: ReactNode
 }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <FullScreenLoader />
+  }
 
   if (!user) {
     return (
@@ -75,7 +94,11 @@ function WorkerRoute({
 }: {
   children: ReactNode
 }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <FullScreenLoader />
+  }
 
   if (!user) {
     return (
@@ -99,7 +122,11 @@ function WorkerRoute({
 }
 
 function RootRedirect() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <FullScreenLoader />
+  }
 
   if (!user) {
     return (
@@ -177,6 +204,15 @@ export default function AppRoutes() {
             </WorkerRoute>
           }
         />
+
+        <Route
+          path="insights/:analysisId"
+          element={
+            <WorkerRoute>
+              <InsightDetailPage />
+            </WorkerRoute>
+          }
+        />
       </Route>
 
       <Route
@@ -208,6 +244,13 @@ export default function AppRoutes() {
           path="insights/dataset/:datasetId"
           element={
             <DatasetDetailPage />
+          }
+        />
+
+        <Route
+          path="insights/analisis/:analysisId"
+          element={
+            <InsightDetailPage />
           }
         />
 

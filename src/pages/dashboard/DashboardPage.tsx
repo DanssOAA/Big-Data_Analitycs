@@ -15,9 +15,12 @@ import {
 import { Link } from 'react-router'
 
 import MetricCard from '../../components/dashboard/MetricCard'
+import RecentActivity from '../../components/dashboard/RecentActivity'
 import SalesChart from '../../components/dashboard/SalesChart'
 
 import { useAuth } from '../../context/AuthContext'
+
+import { computeCrmMetrics } from '../../services/crmMetrics.service'
 
 import {
   getClients,
@@ -80,6 +83,9 @@ export default function DashboardPage() {
   }, [])
 
   const metrics = useMemo(() => {
+    const crmMetrics =
+      computeCrmMetrics(sales)
+
     const now = new Date()
 
     const cutoff = new Date(now)
@@ -102,44 +108,6 @@ export default function DashboardPage() {
           ) >= cutoff
         )
       })
-
-    const totalSales =
-      periodSales.reduce(
-        (total, sale) =>
-          total + sale.amount,
-        0,
-      )
-
-    const averageTicket =
-      periodSales.length === 0
-        ? 0
-        : totalSales /
-          periodSales.length
-
-    const products =
-      new Map<string, number>()
-
-    for (
-      const sale
-      of periodSales
-    ) {
-      products.set(
-        sale.product,
-        (
-          products.get(
-            sale.product,
-          ) ?? 0
-        ) + sale.quantity,
-      )
-    }
-
-    const topProduct =
-      Array.from(
-        products.entries(),
-      ).sort(
-        (a, b) =>
-          b[1] - a[1],
-      )[0]
 
     const grouped =
       new Map<string, number>()
@@ -198,19 +166,14 @@ export default function DashboardPage() {
         )
 
     return {
-      totalSales,
-      averageTicket,
+      totalSales:
+        crmMetrics.totalSales30Days,
+
+      averageTicket:
+        crmMetrics.averageTicket,
 
       topProduct:
-        topProduct
-          ? {
-              name:
-                topProduct[0],
-
-              units:
-                topProduct[1],
-            }
-          : null,
+        crmMetrics.topProduct,
 
       trend,
     }
@@ -284,9 +247,15 @@ export default function DashboardPage() {
         />
       </section>
 
-      <SalesChart
-        data={metrics.trend}
-      />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <SalesChart
+            data={metrics.trend}
+          />
+        </div>
+
+        <RecentActivity />
+      </div>
 
       <section className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
         <div className="border-b border-[var(--border-soft)] p-5">

@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect,
   useRef,
   useState,
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [adminAccess, setAdminAccess] = useState(false)
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const secretClicks = useRef(0)
 
@@ -59,27 +60,33 @@ export default function LoginPage() {
     secretClicks.current = 0
   }
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (
+    event: FormEvent,
+  ) => {
     event.preventDefault()
 
     setError('')
+    setSubmitting(true)
 
-    const result = login(
-      email,
-      password,
-      adminAccess,
-    )
-
-    if (!result.success) {
-      setError(
-        result.message ??
-          'No se pudo iniciar sesion.',
+    try {
+      const result = await login(
+        email,
+        password,
       )
 
-      return
-    }
+      if (!result.success) {
+        setError(
+          result.message ??
+            'No se pudo iniciar sesion.',
+        )
 
-    navigate('/app/dashboard')
+        return
+      }
+
+      navigate('/app/dashboard')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -91,7 +98,7 @@ export default function LoginPage() {
             onClick={handleSecretAccess}
             className="select-none text-2xl font-semibold tracking-tight text-[var(--text-primary)]"
           >
-            CRM Insights
+            Kargia
           </button>
 
           {adminAccess && (
@@ -127,7 +134,7 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             {adminAccess
               ? 'Acceso administrativo habilitado.'
-              : 'Ingresa tus datos para continuar.'}
+              : 'Ingresa tus credenciales corporativas para continuar.'}
           </p>
 
           <form
@@ -176,9 +183,12 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)]"
+              disabled={submitting}
+              className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Ingresar
+              {submitting
+                ? 'Ingresando...'
+                : 'Ingresar'}
             </button>
           </form>
         </div>

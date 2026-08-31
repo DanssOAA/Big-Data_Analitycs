@@ -15,7 +15,7 @@ import type {
   InsightRecord,
 } from '../types/insight.types'
 
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_MODEL = 'gemini-3.6-flash'
 
 const money = new Intl.NumberFormat(
   'es-PE',

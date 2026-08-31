@@ -40,3 +40,37 @@ export interface CrmActivity {
   activityDate: string
   createdAt: string
 }
+
+export interface Product {
+  id: string
+  code: string
+  name: string
+  category: string
+  unit: string
+  unitPrice: number
+  active: boolean
+  createdAt: string
+}
+
+export type ShipmentStatus =
+  | 'En transito'
+  | 'Entregado'
+  | 'Retrasado'
+  | 'Cancelado'
+
+export interface Shipment {
+  id: string
+  code: string
+  clientId: string | null
+  origin: string
+  destination: string
+  carrier: string
+  cargoType: string
+  weightKg: number
+  distanceKm: number
+  cost: number
+  deliveryDays: number
+  status: ShipmentStatus
+  shippedDate: string
+  createdAt: string
+}

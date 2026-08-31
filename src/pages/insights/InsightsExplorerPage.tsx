@@ -383,7 +383,7 @@ export default function InsightsExplorerPage() {
 
         {insights.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center text-sm text-[var(--text-muted)]">
-            Todavia no se generaron analisis. Abre un dataset para comparar sus indicadores con el CRM.
+            Todavia no se generaron analisis. Abre un dataset para comparar sus indicadores con tus ventas registradas.
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
@@ -411,7 +411,7 @@ export default function InsightsExplorerPage() {
                         {insight.comparisonMode ===
                         'datasets'
                           ? 'Mis datos vs competencia'
-                          : 'Dataset vs CRM'}
+                          : 'Dataset vs mis ventas'}
                       </span>
                     </div>
 

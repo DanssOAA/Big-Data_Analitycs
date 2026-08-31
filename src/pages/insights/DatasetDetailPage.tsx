@@ -573,7 +573,7 @@ export default function DatasetDetailPage() {
                   </p>
 
                   <p className="text-xs text-[var(--text-muted)]">
-                    Genera un insight comparando este dataset contra tu CRM o contra uno de tus datasets propios.
+                    Genera un insight comparando este dataset contra tus ventas registradas o contra uno de tus datasets propios.
                   </p>
                 </div>
               </div>
@@ -599,7 +599,7 @@ export default function DatasetDetailPage() {
                       CRM_TARGET
                     }
                   >
-                    Mi CRM (ventas registradas)
+                    Mis ventas registradas
                   </option>
 
                   {internalDatasets.map(
@@ -644,7 +644,7 @@ export default function DatasetDetailPage() {
 
                   {comparing
                     ? 'Analizando...'
-                    : 'Comparar con mi CRM y generar Insight'}
+                    : 'Comparar y generar Insight'}
                 </button>
               </div>
 

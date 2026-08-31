@@ -5,9 +5,12 @@ import {
   BarChart3,
   Database,
   LayoutDashboard,
+  Package,
   ShoppingBag,
   Sparkles,
+  Truck,
   Users,
+  Wand2,
   X,
 } from 'lucide-react'
 
@@ -24,6 +27,7 @@ interface MenuItem {
   label: string
   path: string
   icon: LucideIcon
+  end?: boolean
 }
 
 const crmItems: MenuItem[] = [
@@ -41,6 +45,16 @@ const crmItems: MenuItem[] = [
     label: 'Ventas',
     path: '/app/ventas',
     icon: ShoppingBag,
+  },
+  {
+    label: 'Productos',
+    path: '/app/productos',
+    icon: Package,
+  },
+  {
+    label: 'Envios',
+    path: '/app/envios',
+    icon: Truck,
   },
   {
     label: 'Actividades',
@@ -62,6 +76,12 @@ const workerItems: MenuItem[] = [
     label: 'Insights',
     path: '/app/insights',
     icon: Sparkles,
+    end: true,
+  },
+  {
+    label: 'Generar analisis',
+    path: '/app/insights/nuevo',
+    icon: Wand2,
   },
 ]
 
@@ -77,6 +97,7 @@ function MenuLink({
   return (
     <NavLink
       to={item.path}
+      end={item.end}
       onClick={onClick}
       className={({ isActive }) =>
         [

@@ -14,11 +14,14 @@ import LoginPage from '../pages/auth/LoginPage'
 
 import ActivitiesPage from '../pages/crm/ActivitiesPage'
 import ClientsPage from '../pages/crm/ClientsPage'
+import ProductsPage from '../pages/crm/ProductsPage'
 import SalesPage from '../pages/crm/SalesPage'
+import ShipmentsPage from '../pages/crm/ShipmentsPage'
 
 import DashboardPage from '../pages/dashboard/DashboardPage'
 
 import DatasetDetailPage from '../pages/insights/DatasetDetailPage'
+import GenerateInsightPage from '../pages/insights/GenerateInsightPage'
 import InsightDetailPage from '../pages/insights/InsightDetailPage'
 import InsightsExplorerPage from '../pages/insights/InsightsExplorerPage'
 
@@ -192,6 +195,16 @@ export default function AppRoutes() {
         />
 
         <Route
+          path="productos"
+          element={<ProductsPage />}
+        />
+
+        <Route
+          path="envios"
+          element={<ShipmentsPage />}
+        />
+
+        <Route
           path="actividades"
           element={<ActivitiesPage />}
         />
@@ -201,6 +214,15 @@ export default function AppRoutes() {
           element={
             <WorkerRoute>
               <WorkerInsightsPage />
+            </WorkerRoute>
+          }
+        />
+
+        <Route
+          path="insights/nuevo"
+          element={
+            <WorkerRoute>
+              <GenerateInsightPage />
             </WorkerRoute>
           }
         />

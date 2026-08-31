@@ -30,6 +30,14 @@ function resolveTitle(pathname: string) {
     return 'Ventas'
   }
 
+  if (pathname.includes('/productos')) {
+    return 'Productos'
+  }
+
+  if (pathname.includes('/envios')) {
+    return 'Envios'
+  }
+
   if (pathname.includes('/actividades')) {
     return 'Actividades'
   }

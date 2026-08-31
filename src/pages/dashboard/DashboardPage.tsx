@@ -14,6 +14,7 @@ import {
 
 import { Link } from 'react-router'
 
+import BulkUploadCard from '../../components/dashboard/BulkUploadCard'
 import MetricCard from '../../components/dashboard/MetricCard'
 import RecentActivity from '../../components/dashboard/RecentActivity'
 import SalesChart from '../../components/dashboard/SalesChart'
@@ -355,6 +356,8 @@ export default function DashboardPage() {
           </Link>
         </div>
       </section>
+
+      {isAdmin && <BulkUploadCard />}
     </div>
   )
 }

@@ -52,7 +52,7 @@ create policy "authenticated_all_sales"
 
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
-  client_id uuid references public.clients(id) on delete set null,
+  client_id text references public.clients(id) on delete set null,
   type text not null,
   description text not null,
   activity_date timestamptz not null default now(),
@@ -84,9 +84,13 @@ alter table public.datasets
   check (source_type in ('internal', 'external'));
 
 -- ---------------------------------------------------------
--- 4. RLS admin-only para datasets / dataset_tables / dataset_rows
---    (el trabajador nunca navega datasets crudos, solo insights
---    publicados)
+-- 4. datasets / dataset_tables / dataset_rows
+--    Lectura: cualquier usuario autenticado (el trabajador la
+--    necesita para poder generar comparaciones con IA).
+--    Escritura (subir/editar/borrar datasets): solo admin.
+--    El trabajador NUNCA tiene un explorador de datasets ni un
+--    boton de carga en la interfaz; esto es solo la capa de
+--    datos que habilita el analisis de IA por debajo.
 -- ---------------------------------------------------------
 
 alter table public.datasets enable row level security;
@@ -94,28 +98,97 @@ alter table public.dataset_tables enable row level security;
 alter table public.dataset_rows enable row level security;
 
 drop policy if exists "admin_all_datasets" on public.datasets;
-create policy "admin_all_datasets"
+drop policy if exists "authenticated_read_datasets" on public.datasets;
+drop policy if exists "admin_write_datasets" on public.datasets;
+drop policy if exists "admin_update_datasets" on public.datasets;
+drop policy if exists "admin_delete_datasets" on public.datasets;
+
+create policy "authenticated_read_datasets"
   on public.datasets
-  for all
+  for select
+  to authenticated
+  using (true);
+
+create policy "admin_write_datasets"
+  on public.datasets
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy "admin_update_datasets"
+  on public.datasets
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
+
+create policy "admin_delete_datasets"
+  on public.datasets
+  for delete
+  to authenticated
+  using (public.is_admin());
 
 drop policy if exists "admin_all_dataset_tables" on public.dataset_tables;
-create policy "admin_all_dataset_tables"
+drop policy if exists "authenticated_read_dataset_tables" on public.dataset_tables;
+drop policy if exists "admin_write_dataset_tables" on public.dataset_tables;
+drop policy if exists "admin_update_dataset_tables" on public.dataset_tables;
+drop policy if exists "admin_delete_dataset_tables" on public.dataset_tables;
+
+create policy "authenticated_read_dataset_tables"
   on public.dataset_tables
-  for all
+  for select
+  to authenticated
+  using (true);
+
+create policy "admin_write_dataset_tables"
+  on public.dataset_tables
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy "admin_update_dataset_tables"
+  on public.dataset_tables
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
 
+create policy "admin_delete_dataset_tables"
+  on public.dataset_tables
+  for delete
+  to authenticated
+  using (public.is_admin());
+
 drop policy if exists "admin_all_dataset_rows" on public.dataset_rows;
-create policy "admin_all_dataset_rows"
+drop policy if exists "authenticated_read_dataset_rows" on public.dataset_rows;
+drop policy if exists "admin_write_dataset_rows" on public.dataset_rows;
+drop policy if exists "admin_update_dataset_rows" on public.dataset_rows;
+drop policy if exists "admin_delete_dataset_rows" on public.dataset_rows;
+
+create policy "authenticated_read_dataset_rows"
   on public.dataset_rows
-  for all
+  for select
+  to authenticated
+  using (true);
+
+create policy "admin_write_dataset_rows"
+  on public.dataset_rows
+  for insert
+  to authenticated
+  with check (public.is_admin());
+
+create policy "admin_update_dataset_rows"
+  on public.dataset_rows
+  for update
   to authenticated
   using (public.is_admin())
   with check (public.is_admin());
+
+create policy "admin_delete_dataset_rows"
+  on public.dataset_rows
+  for delete
+  to authenticated
+  using (public.is_admin());
 
 -- Asegurar borrado en cascada (si las FK no lo tenian definido asi)
 alter table public.dataset_tables
@@ -134,9 +207,9 @@ alter table public.dataset_rows
 
 create table if not exists public.insights (
   id uuid primary key default gen_random_uuid(),
-  dataset_id uuid references public.datasets(id) on delete set null,
-  table_id uuid references public.dataset_tables(id) on delete set null,
-  compared_dataset_id uuid references public.datasets(id) on delete set null,
+  dataset_id text references public.datasets(id) on delete set null,
+  table_id text references public.dataset_tables(id) on delete set null,
+  compared_dataset_id text references public.datasets(id) on delete set null,
   comparison_mode text not null default 'crm' check (comparison_mode in ('crm', 'datasets')),
   title text not null,
   gap text,
@@ -156,6 +229,8 @@ create table if not exists public.insights (
 
 alter table public.insights enable row level security;
 
+-- El administrador puede hacer de todo (incluido publicar/despublicar
+-- y ver los borradores de cualquier usuario).
 drop policy if exists "admin_all_insights" on public.insights;
 create policy "admin_all_insights"
   on public.insights
@@ -164,12 +239,28 @@ create policy "admin_all_insights"
   using (public.is_admin())
   with check (public.is_admin());
 
+-- Cualquier usuario autenticado (incluido el trabajador) puede
+-- generar sus propios analisis con la IA...
+drop policy if exists "authenticated_insert_own_insights" on public.insights;
+create policy "authenticated_insert_own_insights"
+  on public.insights
+  for insert
+  to authenticated
+  with check (created_by = auth.uid());
+
+-- ...y puede ver los que ya estan publicados o los que genero el
+-- mismo. Publicar/despublicar sigue siendo exclusivo del admin
+-- (no hay politica de UPDATE para el resto de usuarios).
 drop policy if exists "worker_read_published_insights" on public.insights;
-create policy "worker_read_published_insights"
+drop policy if exists "authenticated_read_insights" on public.insights;
+create policy "authenticated_read_insights"
   on public.insights
   for select
   to authenticated
-  using (published = true);
+  using (
+    published = true
+    or created_by = auth.uid()
+  );
 
 -- ---------------------------------------------------------
 -- 6. profiles (lista de usuarios sin exponer service_role)
@@ -235,7 +326,66 @@ on conflict (id) do update
       role = excluded.role;
 
 -- ---------------------------------------------------------
--- 7. Storage: bucket "datasets" solo accesible por admin
+-- 7. products (catalogo de productos / servicios)
+-- ---------------------------------------------------------
+
+create table if not exists public.products (
+  id text primary key,
+  code text not null,
+  name text not null,
+  category text not null,
+  unit text not null default 'unidad',
+  unit_price numeric not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.products enable row level security;
+
+drop policy if exists "authenticated_all_products" on public.products;
+create policy "authenticated_all_products"
+  on public.products
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- ---------------------------------------------------------
+-- 8. shipments (envios / logistica)
+--    Modulo operativo independiente de ventas: alimenta futuros
+--    analisis de IA con datos logisticos (rutas, transportistas,
+--    tiempos de entrega, costos de flete).
+-- ---------------------------------------------------------
+
+create table if not exists public.shipments (
+  id text primary key,
+  code text not null,
+  client_id text references public.clients(id) on delete set null,
+  origin text not null,
+  destination text not null,
+  carrier text not null,
+  cargo_type text not null,
+  weight_kg numeric not null default 0,
+  distance_km numeric not null default 0,
+  cost numeric not null default 0,
+  delivery_days integer not null default 0,
+  status text not null default 'En transito',
+  shipped_date date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
+alter table public.shipments enable row level security;
+
+drop policy if exists "authenticated_all_shipments" on public.shipments;
+create policy "authenticated_all_shipments"
+  on public.shipments
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- ---------------------------------------------------------
+-- 9. Storage: bucket "datasets" solo accesible por admin
 -- ---------------------------------------------------------
 
 drop policy if exists "admin_all_datasets_storage" on storage.objects;

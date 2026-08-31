@@ -29,28 +29,38 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-function mapUser(
+async function mapUser(
   supabaseUser: {
     id: string
     email?: string | null
     user_metadata?: Record<string, unknown>
   } | null | undefined,
-): AuthUser | null {
+): Promise<AuthUser | null> {
   if (!supabaseUser) {
     return null
   }
 
   const metadata = supabaseUser.user_metadata ?? {}
 
+  const { data: profile } =
+    await supabase
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', supabaseUser.id)
+      .maybeSingle()
+
   const role =
-    metadata.role === 'admin'
+    profile?.role === 'admin'
       ? 'admin'
       : ('worker' as UserRole)
 
   const name =
-    typeof metadata.full_name === 'string' &&
-    metadata.full_name.trim() !== ''
-      ? metadata.full_name
+    typeof profile?.full_name === 'string' &&
+    profile.full_name.trim() !== ''
+      ? profile.full_name
+      : typeof metadata.full_name === 'string' &&
+          metadata.full_name.trim() !== ''
+        ? metadata.full_name
       : (supabaseUser.email ?? 'Usuario')
 
   return {
@@ -85,8 +95,12 @@ export function AuthProvider({
     const { data: listener } =
       supabase.auth.onAuthStateChange(
         (_event, session) => {
-          setUser(mapUser(session?.user))
-          setLoading(false)
+          void mapUser(
+            session?.user,
+          ).then((mappedUser) => {
+            setUser(mappedUser)
+            setLoading(false)
+          })
         },
       )
 
@@ -115,7 +129,7 @@ export function AuthProvider({
       }
     }
 
-    setUser(mapUser(data.user))
+    setUser(await mapUser(data.user))
 
     return { success: true }
   }

@@ -27,7 +27,10 @@ import {
   uploadDataset,
 } from '../../services/datasetStorage.service'
 
-import type { DatasetRecord } from '../../types/dataset.types'
+import type {
+  DatasetRecord,
+  DatasetSourceType,
+} from '../../types/dataset.types'
 import type { InsightRecord } from '../../types/insight.types'
 
 export default function InsightsExplorerPage() {
@@ -38,6 +41,11 @@ export default function InsightsExplorerPage() {
   const [dragging, setDragging] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  const [
+    newDatasetSourceType,
+    setNewDatasetSourceType,
+  ] = useState<DatasetSourceType>('external')
 
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -80,7 +88,10 @@ export default function InsightsExplorerPage() {
 
     for (const file of selectedFiles) {
       try {
-        await uploadDataset(file)
+        await uploadDataset(
+          file,
+          newDatasetSourceType,
+        )
 
         created.push(file.name)
       } catch (exception) {
@@ -100,8 +111,16 @@ export default function InsightsExplorerPage() {
     if (created.length > 0) {
       setMessage(
         created.length === 1
-          ? `Dataset "${created[0]}" creado correctamente.`
-          : `${created.length} datasets creados correctamente.`,
+          ? `Dataset "${created[0]}" creado como ${
+              newDatasetSourceType === 'internal'
+                ? 'Mío'
+                : 'Competencia'
+            }.`
+          : `${created.length} datasets creados como ${
+              newDatasetSourceType === 'internal'
+                ? 'Míos'
+                : 'Competencia'
+            }.`,
       )
     }
 
@@ -156,22 +175,20 @@ export default function InsightsExplorerPage() {
     setMessage('Dataset eliminado.')
   }
 
-  const handleToggleSourceType = async (
+  const handleSourceTypeChange = async (
     dataset: DatasetRecord,
+    sourceType: DatasetSourceType,
   ) => {
-    const nextType =
-      dataset.sourceType ===
-      'internal'
-        ? 'external'
-        : 'internal'
+    if (dataset.sourceType === sourceType) {
+      return
+    }
 
     setDatasets((current) =>
       current.map((item) =>
         item.id === dataset.id
           ? {
               ...item,
-              sourceType:
-                nextType,
+              sourceType,
             }
           : item,
       ),
@@ -180,7 +197,7 @@ export default function InsightsExplorerPage() {
     try {
       await setDatasetSourceType(
         dataset.id,
-        nextType,
+        sourceType,
       )
     } catch {
       setError(
@@ -219,31 +236,56 @@ export default function InsightsExplorerPage() {
           </h2>
 
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Cada archivo cargado se conserva como un dataset independiente.
+            El archivo se procesa y sus filas quedan disponibles para análisis; el archivo original no se almacena.
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={processing}
-          onClick={() =>
-            inputRef.current?.click()
-          }
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {processing ? (
-            <LoaderCircle
-              size={17}
-              className="animate-spin"
-            />
-          ) : (
-            <FileUp size={17} />
-          )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
+            Clasificar como
 
-          {processing
-            ? 'Procesando...'
-            : 'Crear dataset'}
-        </button>
+            <select
+              value={newDatasetSourceType}
+              disabled={processing}
+              onChange={(event) =>
+                setNewDatasetSourceType(
+                  event.target
+                    .value as DatasetSourceType,
+                )
+              }
+              className="bg-transparent text-sm font-semibold text-[var(--text-primary)] outline-none"
+            >
+              <option value="internal">
+                Mío
+              </option>
+              <option value="external">
+                Competencia
+              </option>
+            </select>
+          </label>
+
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() =>
+              inputRef.current?.click()
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {processing ? (
+              <LoaderCircle
+                size={17}
+                className="animate-spin"
+              />
+            ) : (
+              <FileUp size={17} />
+            )}
+
+            {processing
+              ? 'Procesando...'
+              : 'Crear dataset'}
+          </button>
+        </div>
       </section>
 
       {message && (
@@ -287,7 +329,10 @@ export default function InsightsExplorerPage() {
         </p>
 
         <p className="mt-1 text-xs text-[var(--text-muted)]">
-          CSV, XLS o XLSX
+          CSV, XLS o XLSX · se creará como{' '}
+          {newDatasetSourceType === 'internal'
+            ? 'Mío'
+            : 'Competencia'}
         </p>
       </section>
 
@@ -300,7 +345,7 @@ export default function InsightsExplorerPage() {
 
           <div>
             <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              Mis datasets
+              Datasets disponibles
             </h3>
 
             <p className="text-xs text-[var(--text-muted)]">
@@ -351,8 +396,8 @@ export default function InsightsExplorerPage() {
                 key={dataset.id}
                 dataset={dataset}
                 onDelete={handleDelete}
-                onToggleSourceType={
-                  handleToggleSourceType
+                onSourceTypeChange={
+                  handleSourceTypeChange
                 }
               />
             ))}

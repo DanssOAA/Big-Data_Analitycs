@@ -33,21 +33,39 @@ function fromRow(row: ProductRow): Product {
 export async function getProducts(): Promise<
   Product[]
 > {
-  const { data, error } =
-    await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', {
-        ascending: false,
-      })
+  const pageSize = 1000
+  const rows: ProductRow[] = []
 
-  if (error) {
-    throw toError(error)
+  for (
+    let start = 0;
+    ;
+    start += pageSize
+  ) {
+    const { data, error } =
+      await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', {
+          ascending: false,
+        })
+        .range(
+          start,
+          start + pageSize - 1,
+        )
+
+    if (error) {
+      throw toError(error)
+    }
+
+    const page = data as ProductRow[]
+    rows.push(...page)
+
+    if (page.length < pageSize) {
+      break
+    }
   }
 
-  return (data as ProductRow[]).map(
-    fromRow,
-  )
+  return rows.map(fromRow)
 }
 
 export async function saveProduct(

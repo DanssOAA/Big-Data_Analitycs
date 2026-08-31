@@ -1,5 +1,7 @@
 import { toError } from './errors'
 
+import { fetchAllPages } from './pagination'
+
 import { supabase } from './supabaseClient'
 
 import type { CrmActivity } from '../types/crm.types'
@@ -29,20 +31,22 @@ function fromRow(
 export async function getActivities(): Promise<
   CrmActivity[]
 > {
-  const { data, error } = await supabase
-    .from('activities')
-    .select('*')
-    .order('activity_date', {
-      ascending: false,
-    })
+  const rows =
+    await fetchAllPages<ActivityRow>(
+      (from, to) =>
+        supabase
+          .from('activities')
+          .select('*')
+          .order(
+            'activity_date',
+            {
+              ascending: false,
+            },
+          )
+          .range(from, to),
+    )
 
-  if (error) {
-    throw toError(error)
-  }
-
-  return (data as ActivityRow[]).map(
-    fromRow,
-  )
+  return rows.map(fromRow)
 }
 
 export async function saveActivity(

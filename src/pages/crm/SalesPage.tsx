@@ -1,4 +1,6 @@
 ﻿import {
+  ChevronLeft,
+  ChevronRight,
   Plus,
   ReceiptText,
   X,
@@ -36,6 +38,8 @@ const money = new Intl.NumberFormat(
     currency: 'PEN',
   },
 )
+
+const PAGE_SIZE = 25
 
 function today() {
   return new Date()
@@ -132,6 +136,31 @@ export default function SalesPage() {
         ),
       [clients],
     )
+
+  const [page, setPage] =
+    useState(1)
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      sales.length / PAGE_SIZE,
+    ),
+  )
+
+  const currentPage = Math.min(
+    page,
+    totalPages,
+  )
+
+  const pageSales = useMemo(
+    () =>
+      sales.slice(
+        (currentPage - 1) *
+          PAGE_SIZE,
+        currentPage * PAGE_SIZE,
+      ),
+    [sales, currentPage],
+  )
 
   const amount =
     Math.max(
@@ -405,7 +434,7 @@ export default function SalesPage() {
               </thead>
 
               <tbody>
-                {sales.map(
+                {pageSales.map(
                   (sale) => {
                     const client =
                       clientMap.get(
@@ -498,6 +527,62 @@ export default function SalesPage() {
                 )}
               </tbody>
             </table>
+
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border-soft)] px-5 py-4">
+              <p className="text-xs text-[var(--text-muted)]">
+                Pagina {currentPage} de{' '}
+                {totalPages} ·{' '}
+                {sales.length.toLocaleString(
+                  'es-PE',
+                )}{' '}
+                ventas en total
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    currentPage <= 1
+                  }
+                  onClick={() =>
+                    setPage(
+                      (current) =>
+                        Math.max(
+                          1,
+                          current - 1,
+                        ),
+                    )
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft
+                    size={15}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    currentPage >=
+                    totalPages
+                  }
+                  onClick={() =>
+                    setPage(
+                      (current) =>
+                        Math.min(
+                          totalPages,
+                          current + 1,
+                        ),
+                    )
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight
+                    size={15}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>

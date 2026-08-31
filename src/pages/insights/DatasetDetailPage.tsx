@@ -71,8 +71,8 @@ export default function DatasetDetailPage() {
     >(null)
 
   const [
-    internalDatasets,
-    setInternalDatasets,
+    comparisonDatasets,
+    setComparisonDatasets,
   ] = useState<DatasetRecord[]>([])
 
   const [
@@ -98,7 +98,7 @@ export default function DatasetDetailPage() {
   const [
     compareTarget,
     setCompareTarget,
-  ] = useState(CRM_TARGET)
+  ] = useState('')
 
   const [
     comparing,
@@ -133,13 +133,25 @@ export default function DatasetDetailPage() {
           )
         }
 
-        setInternalDatasets(
-          allDatasets.filter(
-            (item) =>
-              item.sourceType ===
-                'internal' &&
-              item.id !== datasetId,
-          ),
+        const compatibleDatasets = result
+          ? allDatasets.filter(
+              (item) =>
+                item.id !== datasetId &&
+                item.sourceType !==
+                  result.sourceType,
+            )
+          : []
+
+        setComparisonDatasets(
+          compatibleDatasets,
+        )
+
+        setCompareTarget(
+          compatibleDatasets[0]?.id ??
+            (result?.sourceType ===
+            'external'
+              ? CRM_TARGET
+              : ''),
         )
 
         setLoading(false)
@@ -350,23 +362,53 @@ export default function DatasetDetailPage() {
           return
         }
 
-        const internalDataset =
+        const comparedDataset =
           await getDataset(
             compareTarget,
           )
 
-        const internalTable =
-          internalDataset
-            ?.tables[0]
-
         if (
-          !internalDataset ||
-          !internalTable
+          !comparedDataset ||
+          comparedDataset.tables.length ===
+            0
         ) {
           throw new Error(
-            'No se pudo cargar el dataset interno seleccionado.',
+            'No se pudo cargar el dataset seleccionado para comparar.',
           )
         }
+
+        if (
+          comparedDataset.sourceType ===
+          dataset.sourceType
+        ) {
+          throw new Error(
+            'La comparación debe cruzar un dataset Mío con uno de Competencia.',
+          )
+        }
+
+        const currentIsInternal =
+          dataset.sourceType ===
+          'internal'
+
+        const internalDataset =
+          currentIsInternal
+            ? dataset
+            : comparedDataset
+
+        const externalDataset =
+          currentIsInternal
+            ? comparedDataset
+            : dataset
+
+        const internalTable =
+          currentIsInternal
+            ? selectedTable
+            : comparedDataset.tables[0]
+
+        const externalTable =
+          currentIsInternal
+            ? comparedDataset.tables[0]
+            : selectedTable
 
         const internalBreakdown =
           buildProductBreakdown(
@@ -375,7 +417,7 @@ export default function DatasetDetailPage() {
 
         const externalBreakdown =
           buildProductBreakdown(
-            selectedTable,
+            externalTable,
           )
 
         const analysis =
@@ -384,7 +426,7 @@ export default function DatasetDetailPage() {
             internalName:
               internalDataset.name,
             externalName:
-              dataset.name,
+              externalDataset.name,
             internalBreakdown,
             externalBreakdown,
           })
@@ -398,7 +440,7 @@ export default function DatasetDetailPage() {
             tableId:
               selectedTable.id,
             comparedDatasetId:
-              internalDataset.id,
+              comparedDataset.id,
             crmSnapshot,
             externalSnapshot: {
               internalBreakdown,
@@ -443,9 +485,18 @@ export default function DatasetDetailPage() {
         </Link>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
-            {dataset.extension}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+              {dataset.extension}
+            </p>
+
+            <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">
+              {dataset.sourceType ===
+              'internal'
+                ? 'Mío'
+                : 'Competencia'}
+            </span>
+          </div>
 
           <h2 className="mt-1 break-all text-2xl font-semibold text-[var(--text-primary)]">
             {dataset.name}
@@ -573,7 +624,11 @@ export default function DatasetDetailPage() {
                   </p>
 
                   <p className="text-xs text-[var(--text-muted)]">
-                    Genera un insight comparando este dataset contra tus ventas registradas o contra uno de tus datasets propios.
+                    Este dataset es{' '}
+                    {dataset.sourceType ===
+                    'internal'
+                      ? 'Mío: elige el dataset de Competencia que quieras comparar.'
+                      : 'de Competencia: elige uno de tus datasets propios para compararlo.'}
                   </p>
                 </div>
               </div>
@@ -594,15 +649,16 @@ export default function DatasetDetailPage() {
                   }
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-3 text-sm text-[var(--text-primary)] sm:w-80"
                 >
-                  <option
-                    value={
-                      CRM_TARGET
-                    }
-                  >
-                    Mis ventas registradas
-                  </option>
+                  {comparisonDatasets.length ===
+                    0 &&
+                    dataset.sourceType ===
+                      'internal' && (
+                      <option value="">
+                        No hay datasets de Competencia
+                      </option>
+                    )}
 
-                  {internalDatasets.map(
+                  {comparisonDatasets.map(
                     (item) => (
                       <option
                         key={
@@ -615,16 +671,31 @@ export default function DatasetDetailPage() {
                         {
                           item.name
                         }{' '}
-                        (mis datos)
+                        (
+                        {item.sourceType ===
+                        'internal'
+                          ? 'Mío'
+                          : 'Competencia'}
+                        )
                       </option>
                     ),
+                  )}
+
+                  {dataset.sourceType ===
+                    'external' && (
+                    <option
+                      value={CRM_TARGET}
+                    >
+                      Mis ventas registradas (CRM)
+                    </option>
                   )}
                 </select>
 
                 <button
                   type="button"
                   disabled={
-                    comparing
+                    comparing ||
+                    !compareTarget
                   }
                   onClick={
                     runComparison
@@ -647,6 +718,16 @@ export default function DatasetDetailPage() {
                     : 'Comparar y generar Insight'}
                 </button>
               </div>
+
+              {comparisonDatasets.length ===
+                0 && (
+                <p className="mt-3 text-xs text-[var(--text-muted)]">
+                  {dataset.sourceType ===
+                  'internal'
+                    ? 'Clasifica al menos otro dataset como Competencia para habilitar la comparación.'
+                    : 'Todavía no hay datasets Míos; puedes comparar temporalmente contra las ventas del CRM.'}
+                </p>
+              )}
 
               {compareError && (
                 <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">

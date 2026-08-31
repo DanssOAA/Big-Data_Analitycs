@@ -1,5 +1,7 @@
 import { toError } from './errors'
 
+import { fetchAllPages } from './pagination'
+
 import { supabase } from './supabaseClient'
 
 import type {
@@ -88,20 +90,18 @@ function toSaleRow(sale: CrmSale): SaleRow {
 }
 
 export async function getClients(): Promise<CrmClient[]> {
-  const { data, error } = await supabase
-    .from('clients')
-    .select('*')
-    .order('created_at', {
-      ascending: false,
-    })
-
-  if (error) {
-    throw toError(error)
-  }
-
-  return (data as ClientRow[]).map(
-    fromClientRow,
+  const rows = await fetchAllPages<ClientRow>(
+    (from, to) =>
+      supabase
+        .from('clients')
+        .select('*')
+        .order('created_at', {
+          ascending: false,
+        })
+        .range(from, to),
   )
+
+  return rows.map(fromClientRow)
 }
 
 export async function saveClient(
@@ -130,23 +130,21 @@ export async function deleteClient(
 }
 
 export async function getSales(): Promise<CrmSale[]> {
-  const { data, error } = await supabase
-    .from('sales')
-    .select('*')
-    .order('date', {
-      ascending: false,
-    })
-    .order('created_at', {
-      ascending: false,
-    })
-
-  if (error) {
-    throw toError(error)
-  }
-
-  return (data as SaleRow[]).map(
-    fromSaleRow,
+  const rows = await fetchAllPages<SaleRow>(
+    (from, to) =>
+      supabase
+        .from('sales')
+        .select('*')
+        .order('date', {
+          ascending: false,
+        })
+        .order('created_at', {
+          ascending: false,
+        })
+        .range(from, to),
   )
+
+  return rows.map(fromSaleRow)
 }
 
 export async function saveSale(

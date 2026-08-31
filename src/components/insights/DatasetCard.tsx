@@ -7,15 +7,19 @@
 
 import { Link } from 'react-router'
 
-import type { DatasetRecord } from '../../types/dataset.types'
+import type {
+  DatasetRecord,
+  DatasetSourceType,
+} from '../../types/dataset.types'
 
 interface DatasetCardProps {
   dataset: DatasetRecord
   onDelete: (
     id: string,
   ) => void
-  onToggleSourceType: (
+  onSourceTypeChange: (
     dataset: DatasetRecord,
+    sourceType: DatasetSourceType,
   ) => void
 }
 
@@ -41,7 +45,7 @@ function formatSize(
 export default function DatasetCard({
   dataset,
   onDelete,
-  onToggleSourceType,
+  onSourceTypeChange,
 }: DatasetCardProps) {
   const isInternal =
     dataset.sourceType ===
@@ -178,34 +182,54 @@ export default function DatasetCard({
             )}
           </span>
 
-          <button
-            type="button"
-            onClick={() =>
-              onToggleSourceType(
-                dataset,
-              )
-            }
-            title="Cambiar entre mis datos y competencia"
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
-              isInternal
-                ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
-                : 'bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-            }`}
+          <div
+            className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] p-0.5"
+            aria-label="Clasificación del dataset"
           >
-            {isInternal ? (
+            <button
+              type="button"
+              aria-pressed={isInternal}
+              onClick={() =>
+                onSourceTypeChange(
+                  dataset,
+                  'internal',
+                )
+              }
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
+                isInternal
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
               <UserRoundCheck
                 size={11}
               />
-            ) : (
+
+              Mío
+            </button>
+
+            <button
+              type="button"
+              aria-pressed={!isInternal}
+              onClick={() =>
+                onSourceTypeChange(
+                  dataset,
+                  'external',
+                )
+              }
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition ${
+                !isInternal
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
               <Building2
                 size={11}
               />
-            )}
 
-            {isInternal
-              ? 'Mis datos'
-              : 'Competencia'}
-          </button>
+              Competencia
+            </button>
+          </div>
         </div>
 
         <Link

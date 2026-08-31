@@ -1,21 +1,11 @@
-import {
-  parseDateValue,
-  parseNumericValue,
-} from './datasetParser.service'
-
 import { toError } from './errors'
 
-import {
-  getClients,
-  saveClient,
-} from './crmStorage.service'
+import { fetchAllPages } from './pagination'
 
 import { supabase } from './supabaseClient'
 
 import type {
-  CrmClient,
   Shipment,
-  ShipmentStatus,
 } from '../types/crm.types'
 
 import type { DatasetTable } from '../types/dataset.types'
@@ -68,21 +58,22 @@ function fromRow(
 export async function getShipments(): Promise<
   Shipment[]
 > {
-  const { data, error } =
-    await supabase
-      .from('shipments')
-      .select('*')
-      .order('shipped_date', {
-        ascending: false,
-      })
+  const rows =
+    await fetchAllPages<ShipmentRow>(
+      (from, to) =>
+        supabase
+          .from('shipments')
+          .select('*')
+          .order(
+            'shipped_date',
+            {
+              ascending: false,
+            },
+          )
+          .range(from, to),
+    )
 
-  if (error) {
-    throw toError(error)
-  }
-
-  return (data as ShipmentRow[]).map(
-    fromRow,
-  )
+  return rows.map(fromRow)
 }
 
 export async function saveShipment(
@@ -134,18 +125,10 @@ export async function deleteShipment(
 }
 
 // =========================================================
-// Importar un dataset (CSV/Excel) directamente como Envios
-// reales del CRM, creando los Clientes que hagan falta.
+// Deteccion de columnas: reconocer si una tabla de un dataset
+// tiene forma de historico de envios/ventas logisticas, para que
+// bulkImport.service.ts pueda importarla al CRM real.
 // =========================================================
-
-const BULK_INSERT_BATCH_SIZE = 500
-
-const VALID_STATUSES: ShipmentStatus[] = [
-  'En transito',
-  'Entregado',
-  'Retrasado',
-  'Cancelado',
-]
 
 const ACCENTED_CHARS: Record<string, string> = {
   á: 'a',
@@ -157,7 +140,9 @@ const ACCENTED_CHARS: Record<string, string> = {
   ü: 'u',
 }
 
-function normalizeLabel(label: string) {
+export function normalizeLabel(
+  label: string,
+) {
   let result = label.toLowerCase()
 
   for (const [
@@ -166,9 +151,9 @@ function normalizeLabel(label: string) {
   ] of Object.entries(
     ACCENTED_CHARS,
   )) {
-    result = result.split(
-      accented,
-    ).join(plain)
+    result = result
+      .split(accented)
+      .join(plain)
   }
 
   return result.replace(
@@ -200,7 +185,7 @@ function findColumnKey(
   return column?.key ?? null
 }
 
-interface ShipmentColumnMapping {
+export interface ShipmentColumnMapping {
   date: string | null
   client: string | null
   origin: string
@@ -217,7 +202,8 @@ interface ShipmentColumnMapping {
 /**
  * Reconoce si una tabla de un dataset tiene la forma de un
  * historico de envios (columnas Origen/Destino como minimo) para
- * poder importarla directo al modulo de Envios del CRM.
+ * poder importarla directo al CRM real (Clientes, Productos,
+ * Ventas y Envios).
  */
 export function detectShipmentColumns(
   table: DatasetTable,
@@ -287,292 +273,5 @@ export function detectShipmentColumns(
       'estado',
       'status',
     ]),
-  }
-}
-
-function normalizeStatus(
-  value: unknown,
-): ShipmentStatus {
-  const text = String(value ?? '')
-    .trim()
-
-  const match = VALID_STATUSES.find(
-    (status) =>
-      status.toLowerCase() ===
-      text.toLowerCase(),
-  )
-
-  return match ?? 'Entregado'
-}
-
-function toIsoDate(
-  value: unknown,
-): string {
-  const parsed = parseDateValue(
-    value as string | number | boolean | null,
-  )
-
-  if (parsed === null) {
-    return new Date()
-      .toISOString()
-      .slice(0, 10)
-  }
-
-  return new Date(parsed)
-    .toISOString()
-    .slice(0, 10)
-}
-
-function chunk<T>(
-  items: T[],
-  size: number,
-): T[][] {
-  const chunks: T[][] = []
-
-  for (
-    let index = 0;
-    index < items.length;
-    index += size
-  ) {
-    chunks.push(
-      items.slice(
-        index,
-        index + size,
-      ),
-    )
-  }
-
-  return chunks
-}
-
-export interface ShipmentImportResult {
-  matched: boolean
-  imported: number
-  clientsCreated: number
-}
-
-/**
- * Importa una tabla de dataset directamente como filas reales de
- * la tabla `shipments` (y crea los `clients` que hagan falta por
- * nombre). Pensado para que un CSV historico (como el generado en
- * sample-data/) pueda llenar el CRM real, no solo quedar como un
- * dataset para IA.
- */
-export interface ShipmentImportProgress {
-  imported: number
-  total: number
-}
-
-export async function importShipmentsFromTable(
-  table: DatasetTable,
-  onProgress?: (
-    progress: ShipmentImportProgress,
-  ) => void,
-): Promise<ShipmentImportResult> {
-  const mapping =
-    detectShipmentColumns(table)
-
-  if (!mapping) {
-    return {
-      matched: false,
-      imported: 0,
-      clientsCreated: 0,
-    }
-  }
-
-  const existingClients =
-    await getClients()
-
-  const clientIndex = new Map<
-    string,
-    string
-  >(
-    existingClients.map(
-      (client) => [
-        normalizeLabel(
-          client.company ||
-            client.name,
-        ),
-        client.id,
-      ],
-    ),
-  )
-
-  const newClientNames = new Map<
-    string,
-    string
-  >()
-
-  if (mapping.client) {
-    for (const row of table.rows) {
-      const raw = row[mapping.client]
-
-      if (!raw) {
-        continue
-      }
-
-      const name = String(raw).trim()
-      const key = normalizeLabel(name)
-
-      if (
-        !clientIndex.has(key) &&
-        !newClientNames.has(key)
-      ) {
-        newClientNames.set(key, name)
-      }
-    }
-  }
-
-  for (const [
-    key,
-    name,
-  ] of newClientNames) {
-    const newClient: CrmClient = {
-      id: crypto.randomUUID(),
-      code: `CLI-${Date.now()
-        .toString(36)
-        .toUpperCase()}${Math.floor(
-        Math.random() * 900 + 100,
-      )}`,
-      name,
-      company: name,
-      email: `contacto@${normalizeLabel(name) || 'cliente'}.com`,
-      phone: '',
-      status: 'Activo',
-      createdAt:
-        new Date().toISOString(),
-    }
-
-    await saveClient(newClient)
-
-    clientIndex.set(key, newClient.id)
-  }
-
-  const stamp = Date.now()
-    .toString(36)
-    .toUpperCase()
-
-  const shipmentRows = table.rows
-    .map((row, rowIndex) => {
-      const origin = String(
-        row[mapping.origin] ?? '',
-      ).trim()
-
-      const destination = String(
-        row[mapping.destination] ?? '',
-      ).trim()
-
-      if (!origin || !destination) {
-        return null
-      }
-
-      const clientRaw = mapping.client
-        ? row[mapping.client]
-        : null
-
-      const clientId = clientRaw
-        ? (clientIndex.get(
-            normalizeLabel(
-              String(clientRaw),
-            ),
-          ) ?? null)
-        : null
-
-      return {
-        id: crypto.randomUUID(),
-        code: `ENV-${stamp}-${rowIndex + 1}`,
-        client_id: clientId,
-        origin,
-        destination,
-        carrier: mapping.carrier
-          ? String(
-              row[mapping.carrier] ??
-                'Sin transportista',
-            )
-          : 'Sin transportista',
-        cargo_type: mapping.cargoType
-          ? String(
-              row[
-                mapping.cargoType
-              ] ?? 'General',
-            )
-          : 'General',
-        weight_kg: mapping.weight
-          ? (parseNumericValue(
-              row[mapping.weight],
-            ) ?? 0)
-          : 0,
-        distance_km: mapping.distance
-          ? (parseNumericValue(
-              row[mapping.distance],
-            ) ?? 0)
-          : 0,
-        cost: mapping.cost
-          ? (parseNumericValue(
-              row[mapping.cost],
-            ) ?? 0)
-          : 0,
-        delivery_days:
-          mapping.deliveryDays
-            ? Math.round(
-                parseNumericValue(
-                  row[
-                    mapping
-                      .deliveryDays
-                  ],
-                ) ?? 0,
-              )
-            : 0,
-        status: normalizeStatus(
-          mapping.status
-            ? row[mapping.status]
-            : null,
-        ),
-        shipped_date: mapping.date
-          ? toIsoDate(
-              row[mapping.date],
-            )
-          : new Date()
-              .toISOString()
-              .slice(0, 10),
-        created_at:
-          new Date().toISOString(),
-      }
-    })
-    .filter(
-      (
-        row,
-      ): row is NonNullable<
-        typeof row
-      > => row !== null,
-    )
-
-  let imported = 0
-
-  for (const batch of chunk(
-    shipmentRows,
-    BULK_INSERT_BATCH_SIZE,
-  )) {
-    const { error } = await supabase
-      .from('shipments')
-      .insert(batch)
-
-    if (error) {
-      throw toError(error)
-    }
-
-    imported += batch.length
-
-    onProgress?.({
-      imported,
-      total: shipmentRows.length,
-    })
-  }
-
-  return {
-    matched: true,
-    imported,
-    clientsCreated:
-      newClientNames.size,
   }
 }

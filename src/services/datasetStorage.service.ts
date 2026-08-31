@@ -88,29 +88,10 @@ function toDatasetRecord(
 
 export async function uploadDataset(
   file: File,
+  sourceType: DatasetSourceType = 'external',
 ): Promise<DatasetRecord> {
   const parsed =
     await parseDatasetFile(file)
-
-  const storagePath = `${parsed.id}/${file.name}`
-
-  const { error: uploadError } =
-    await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, file, {
-        upsert: true,
-      })
-
-  if (uploadError) {
-    throw toError(uploadError)
-  }
-
-  const cleanup = async () => {
-    await supabase.storage
-      .from(STORAGE_BUCKET)
-      .remove([storagePath])
-      .catch(() => undefined)
-  }
 
   const { error: datasetError } =
     await supabase
@@ -124,16 +105,15 @@ export async function uploadDataset(
           parsed.sizeBytes,
         created_at:
           parsed.createdAt,
-        storage_path: storagePath,
+        storage_path: null,
         total_rows:
           parsed.totalRows,
         total_columns:
           parsed.totalColumns,
-        source_type: 'external',
+        source_type: sourceType,
       })
 
   if (datasetError) {
-    await cleanup()
     throw toError(datasetError)
   }
 
@@ -192,15 +172,13 @@ export async function uploadDataset(
       // best-effort cleanup, se ignora el error
     }
 
-    await cleanup()
-
     throw exception
   }
 
   return {
     ...parsed,
-    storagePath,
-    sourceType: 'external',
+    storagePath: null,
+    sourceType,
     truncated: false,
   }
 }

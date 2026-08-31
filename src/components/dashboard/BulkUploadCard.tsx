@@ -1,8 +1,8 @@
 import {
-  ArrowUpRight,
   FileUp,
   LoaderCircle,
-  Sparkles,
+  PackagePlus,
+  Truck,
   UploadCloud,
 } from 'lucide-react'
 
@@ -14,50 +14,81 @@ import {
 
 import { Link } from 'react-router'
 
-import { uploadDataset } from '../../services/datasetStorage.service'
+import {
+  importHistoricalTable,
+  type BulkImportProgress,
+} from '../../services/bulkImport.service'
+
+import { parseDatasetFile } from '../../services/datasetParser.service'
 
 import {
-  detectShipmentColumns,
-  importShipmentsFromTable,
-} from '../../services/shipmentsStorage.service'
+  importProductsFromFile,
+  type ProductImportProgress,
+} from '../../services/productImport.service'
 
-import type { DatasetTable } from '../../types/dataset.types'
+import { detectShipmentColumns } from '../../services/shipmentsStorage.service'
 
 import DangerZoneMenu from './DangerZoneMenu'
+
+type ImportMode =
+  | 'products'
+  | 'history'
+
+interface VisibleProgress {
+  label: string
+  imported: number
+  total: number
+}
+
+const STAGE_LABELS: Record<
+  BulkImportProgress['stage'],
+  string
+> = {
+  clients: 'Creando clientes',
+  products: 'Creando productos',
+  sales: 'Importando ventas',
+  shipments: 'Importando envíos',
+}
 
 export default function BulkUploadCard() {
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [processing, setProcessing] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const [lastDatasetId, setLastDatasetId] = useState('')
+  const [mode, setMode] =
+    useState<ImportMode>('products')
 
-  const [
-    shipmentTable,
-    setShipmentTable,
-  ] = useState<DatasetTable | null>(
-    null,
-  )
+  const [processing, setProcessing] =
+    useState(false)
 
-  const [
-    importing,
-    setImporting,
-  ] = useState(false)
+  const [dragging, setDragging] =
+    useState(false)
 
-  const [
-    importMessage,
-    setImportMessage,
-  ] = useState('')
+  const [message, setMessage] =
+    useState('')
 
-  const [
-    importProgress,
-    setImportProgress,
-  ] = useState<{
-    imported: number
-    total: number
-  } | null>(null)
+  const [error, setError] =
+    useState('')
+
+  const [progress, setProgress] =
+    useState<VisibleProgress | null>(null)
+
+  const showProductProgress = (
+    next: ProductImportProgress,
+  ) => {
+    setProgress({
+      label: 'Importando productos',
+      ...next,
+    })
+  }
+
+  const showHistoricalProgress = (
+    next: BulkImportProgress,
+  ) => {
+    setProgress({
+      label: STAGE_LABELS[next.stage],
+      imported: next.imported,
+      total: next.total,
+    })
+  }
 
   const processFiles = async (
     files: FileList | File[],
@@ -71,54 +102,95 @@ export default function BulkUploadCard() {
     setProcessing(true)
     setMessage('')
     setError('')
-    setLastDatasetId('')
-    setShipmentTable(null)
-    setImportMessage('')
+    setProgress(null)
 
-    const created: string[] = []
     const failed: string[] = []
-    let createdId = ''
-    let matchedTable: DatasetTable | null =
-      null
+    let importedFiles = 0
+
+    let productsCreated = 0
+    let productsUpdated = 0
+    let rowsSkipped = 0
+
+    let clientsCreated = 0
+    let historicalProductsCreated = 0
+    let salesImported = 0
+    let shipmentsImported = 0
 
     for (const file of selectedFiles) {
       try {
-        const dataset =
-          await uploadDataset(file)
+        if (mode === 'products') {
+          const result =
+            await importProductsFromFile(
+              file,
+              showProductProgress,
+            )
 
-        created.push(file.name)
-        createdId = dataset.id
-
-        if (!matchedTable) {
-          matchedTable =
-            dataset.tables.find(
-              (table) =>
-                detectShipmentColumns(
-                  table,
-                ) !== null,
-            ) ?? null
+          productsCreated += result.created
+          productsUpdated += result.updated
+          rowsSkipped += result.skipped
+          importedFiles += 1
+          continue
         }
-      } catch (exception) {
-        const description =
-          exception instanceof Error
-            ? exception.message
-            : 'Error desconocido'
 
+        const parsed =
+          await parseDatasetFile(file)
+
+        const historicalTables =
+          parsed.tables.filter(
+            (table) =>
+              detectShipmentColumns(table) !==
+              null,
+          )
+
+        if (historicalTables.length === 0) {
+          throw new Error(
+            'No se encontraron las columnas Origen y Destino requeridas para un histórico.',
+          )
+        }
+
+        for (const table of historicalTables) {
+          const result =
+            await importHistoricalTable(
+              table,
+              showHistoricalProgress,
+            )
+
+          clientsCreated +=
+            result.clientsCreated
+          historicalProductsCreated +=
+            result.productsCreated
+          salesImported +=
+            result.salesImported
+          shipmentsImported +=
+            result.shipmentsImported
+        }
+
+        importedFiles += 1
+      } catch (exception) {
         failed.push(
-          `${file.name}: ${description}`,
+          `${file.name}: ${
+            exception instanceof Error
+              ? exception.message
+              : 'Error desconocido'
+          }`,
         )
       }
     }
 
-    if (created.length > 0) {
-      setMessage(
-        created.length === 1
-          ? `"${created[0]}" cargado correctamente.`
-          : `${created.length} archivos cargados correctamente.`,
-      )
-
-      setLastDatasetId(createdId)
-      setShipmentTable(matchedTable)
+    if (importedFiles > 0) {
+      if (mode === 'products') {
+        setMessage(
+          `${productsCreated.toLocaleString('es-PE')} productos creados y ${productsUpdated.toLocaleString('es-PE')} actualizados` +
+            (rowsSkipped > 0
+              ? `; ${rowsSkipped.toLocaleString('es-PE')} filas vacías omitidas.`
+              : '.') +
+            ' El archivo no fue almacenado.',
+        )
+      } else {
+        setMessage(
+          `${clientsCreated.toLocaleString('es-PE')} clientes y ${historicalProductsCreated.toLocaleString('es-PE')} productos creados; ${salesImported.toLocaleString('es-PE')} ventas y ${shipmentsImported.toLocaleString('es-PE')} envíos importados. El archivo no fue almacenado.`,
+        )
+      }
     }
 
     if (failed.length > 0) {
@@ -126,54 +198,12 @@ export default function BulkUploadCard() {
     }
 
     setProcessing(false)
+    setProgress(null)
 
     if (inputRef.current) {
       inputRef.current.value = ''
     }
   }
-
-  const handleImportShipments =
-    async () => {
-      if (!shipmentTable) {
-        return
-      }
-
-      setImporting(true)
-      setImportMessage('')
-      setImportProgress({
-        imported: 0,
-        total: shipmentTable.rows.length,
-      })
-
-      try {
-        const result =
-          await importShipmentsFromTable(
-            shipmentTable,
-            (progress) =>
-              setImportProgress(
-                progress,
-              ),
-          )
-
-        setImportMessage(
-          `${result.imported.toLocaleString('es-PE')} envios importados` +
-            (result.clientsCreated > 0
-              ? ` (${result.clientsCreated} clientes nuevos creados).`
-              : '.'),
-        )
-
-        setShipmentTable(null)
-      } catch (exception) {
-        setError(
-          exception instanceof Error
-            ? exception.message
-            : 'No se pudo importar el archivo como envios.',
-        )
-      } finally {
-        setImporting(false)
-        setImportProgress(null)
-      }
-    }
 
   const handleDrop = (
     event: DragEvent<HTMLDivElement>,
@@ -182,6 +212,15 @@ export default function BulkUploadCard() {
     setDragging(false)
     void processFiles(event.dataTransfer.files)
   }
+
+  const progressPercentage =
+    progress && progress.total > 0
+      ? Math.round(
+          (progress.imported /
+            progress.total) *
+            100,
+        )
+      : 0
 
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
@@ -208,11 +247,11 @@ export default function BulkUploadCard() {
 
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">
-              Carga masiva de datos
+              Carga masiva al CRM
             </p>
 
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Sube un archivo CSV o Excel para analizarlo con IA, o para llenar tus modulos con datos reales.
+            <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">
+              El archivo se usa solo para leer las filas: no se guarda ni se crea un dataset. Cada fila se convierte en un registro real del CRM.
             </p>
           </div>
         </div>
@@ -236,12 +275,66 @@ export default function BulkUploadCard() {
             )}
 
             {processing
-              ? 'Procesando...'
+              ? 'Importando...'
               : 'Seleccionar archivo'}
           </button>
 
           <DangerZoneMenu />
         </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          disabled={processing}
+          onClick={() => setMode('products')}
+          className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${
+            mode === 'products'
+              ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+              : 'border-[var(--border)] bg-[var(--surface-elevated)]'
+          }`}
+        >
+          <PackagePlus
+            size={18}
+            className="mt-0.5 shrink-0 text-[var(--accent)]"
+          />
+
+          <span>
+            <span className="block text-sm font-semibold text-[var(--text-primary)]">
+              Productos
+            </span>
+
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
+              Crea o actualiza el catálogo usando Código, Producto, Categoría, Unidad y Precio.
+            </span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          disabled={processing}
+          onClick={() => setMode('history')}
+          className={`flex items-start gap-3 rounded-xl border p-4 text-left transition ${
+            mode === 'history'
+              ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+              : 'border-[var(--border)] bg-[var(--surface-elevated)]'
+          }`}
+        >
+          <Truck
+            size={18}
+            className="mt-0.5 shrink-0 text-[var(--accent)]"
+          />
+
+          <span>
+            <span className="block text-sm font-semibold text-[var(--text-primary)]">
+              Histórico logístico
+            </span>
+
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
+              Convierte un histórico en Clientes, Productos, Ventas y Envíos.
+            </span>
+          </span>
+        </button>
       </div>
 
       <div
@@ -257,91 +350,61 @@ export default function BulkUploadCard() {
           setDragging(false)
         }
         onDrop={handleDrop}
-        className={`mt-5 rounded-xl border border-dashed p-5 text-center text-sm transition ${
+        className={`mt-4 rounded-xl border border-dashed p-5 text-center text-sm transition ${
           dragging
             ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
             : 'border-[var(--border)] text-[var(--text-muted)]'
         }`}
       >
-        O arrastra el archivo aqui — CSV, XLS o XLSX.
+        Arrastra aquí CSV, XLS o XLSX para importar como{' '}
+        <span className="font-semibold text-[var(--text-secondary)]">
+          {mode === 'products'
+            ? 'Productos'
+            : 'Histórico logístico'}
+        </span>
+        .
       </div>
+
+      {processing && progress && (
+        <div className="mt-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3">
+          <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
+            <span>{progress.label}</span>
+            <span>
+              {progress.imported.toLocaleString(
+                'es-PE',
+              )}{' '}
+              /{' '}
+              {progress.total.toLocaleString(
+                'es-PE',
+              )}
+            </span>
+          </div>
+
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/10">
+            <div
+              className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+              style={{
+                width: `${progressPercentage}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 sm:flex-row sm:items-center">
           <span>{message}</span>
 
-          {lastDatasetId && (
-            <Link
-              to={`/admin/insights/dataset/${lastDatasetId}`}
-              className="inline-flex shrink-0 items-center gap-1.5 font-semibold"
-            >
-              Ver dataset
-              <ArrowUpRight size={14} />
-            </Link>
-          )}
-        </div>
-      )}
-
-      {shipmentTable && (
-        <div className="mt-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-primary)]">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <span>
-              Este archivo tiene forma de historico de envios (
-              {shipmentTable.rows.length.toLocaleString(
-                'es-PE',
-              )}{' '}
-              filas). Puedes llenar el modulo de Envios con estos
-              datos reales.
-            </span>
-
-            <button
-              type="button"
-              disabled={importing}
-              onClick={() =>
-                void handleImportShipments()
-              }
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {importing ? (
-                <LoaderCircle
-                  size={14}
-                  className="animate-spin"
-                />
-              ) : (
-                <Sparkles size={14} />
-              )}
-
-              {importing
-                ? `Importando ${importProgress?.imported.toLocaleString('es-PE') ?? 0} / ${importProgress?.total.toLocaleString('es-PE') ?? 0}...`
-                : 'Importar como Envios'}
-            </button>
-          </div>
-
-          {importing && importProgress && (
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10">
-              <div
-                className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
-                style={{
-                  width: `${
-                    importProgress.total ===
-                    0
-                      ? 0
-                      : Math.round(
-                          (importProgress.imported /
-                            importProgress.total) *
-                            100,
-                        )
-                  }%`,
-                }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {importMessage && (
-        <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
-          {importMessage}
+          <Link
+            to={
+              mode === 'products'
+                ? '/app/productos'
+                : '/app/envios'
+            }
+            className="shrink-0 font-semibold"
+          >
+            Ver registros
+          </Link>
         </div>
       )}
 

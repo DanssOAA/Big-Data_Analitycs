@@ -1,4 +1,6 @@
 import {
+  ChevronLeft,
+  ChevronRight,
   Plus,
   Truck,
   X,
@@ -71,6 +73,8 @@ function emptyForm(): ShipmentForm {
   }
 }
 
+const PAGE_SIZE = 25
+
 const statusStyles: Record<
   ShipmentStatus,
   string
@@ -116,6 +120,9 @@ export default function ShipmentsPage() {
       emptyForm(),
     )
 
+  const [page, setPage] =
+    useState(1)
+
   useEffect(() => {
     const load = async () => {
       const [
@@ -147,6 +154,28 @@ export default function ShipmentsPage() {
         ),
       ),
     [clients],
+  )
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      shipments.length / PAGE_SIZE,
+    ),
+  )
+
+  const currentPage = Math.min(
+    page,
+    totalPages,
+  )
+
+  const pageShipments = useMemo(
+    () =>
+      shipments.slice(
+        (currentPage - 1) *
+          PAGE_SIZE,
+        currentPage * PAGE_SIZE,
+      ),
+    [shipments, currentPage],
   )
 
   const createShipment = async (
@@ -324,7 +353,7 @@ export default function ShipmentsPage() {
               </thead>
 
               <tbody>
-                {shipments.map(
+                {pageShipments.map(
                   (shipment) => {
                     const client =
                       shipment.clientId
@@ -426,6 +455,62 @@ export default function ShipmentsPage() {
                 )}
               </tbody>
             </table>
+
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border-soft)] px-5 py-4">
+              <p className="text-xs text-[var(--text-muted)]">
+                Pagina {currentPage} de{' '}
+                {totalPages} ·{' '}
+                {shipments.length.toLocaleString(
+                  'es-PE',
+                )}{' '}
+                envios en total
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    currentPage <= 1
+                  }
+                  onClick={() =>
+                    setPage(
+                      (current) =>
+                        Math.max(
+                          1,
+                          current - 1,
+                        ),
+                    )
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft
+                    size={15}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    currentPage >=
+                    totalPages
+                  }
+                  onClick={() =>
+                    setPage(
+                      (current) =>
+                        Math.min(
+                          totalPages,
+                          current + 1,
+                        ),
+                    )
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight
+                    size={15}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>

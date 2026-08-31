@@ -358,8 +358,16 @@ export interface ShipmentImportResult {
  * sample-data/) pueda llenar el CRM real, no solo quedar como un
  * dataset para IA.
  */
+export interface ShipmentImportProgress {
+  imported: number
+  total: number
+}
+
 export async function importShipmentsFromTable(
   table: DatasetTable,
+  onProgress?: (
+    progress: ShipmentImportProgress,
+  ) => void,
 ): Promise<ShipmentImportResult> {
   const mapping =
     detectShipmentColumns(table)
@@ -554,6 +562,11 @@ export async function importShipmentsFromTable(
     }
 
     imported += batch.length
+
+    onProgress?.({
+      imported,
+      total: shipmentRows.length,
+    })
   }
 
   return {

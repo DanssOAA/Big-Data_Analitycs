@@ -51,6 +51,14 @@ export default function BulkUploadCard() {
     setImportMessage,
   ] = useState('')
 
+  const [
+    importProgress,
+    setImportProgress,
+  ] = useState<{
+    imported: number
+    total: number
+  } | null>(null)
+
   const processFiles = async (
     files: FileList | File[],
   ) => {
@@ -132,11 +140,19 @@ export default function BulkUploadCard() {
 
       setImporting(true)
       setImportMessage('')
+      setImportProgress({
+        imported: 0,
+        total: shipmentTable.rows.length,
+      })
 
       try {
         const result =
           await importShipmentsFromTable(
             shipmentTable,
+            (progress) =>
+              setImportProgress(
+                progress,
+              ),
           )
 
         setImportMessage(
@@ -155,6 +171,7 @@ export default function BulkUploadCard() {
         )
       } finally {
         setImporting(false)
+        setImportProgress(null)
       }
     }
 
@@ -266,37 +283,59 @@ export default function BulkUploadCard() {
       )}
 
       {shipmentTable && (
-        <div className="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-primary)] sm:flex-row sm:items-center">
-          <span>
-            Este archivo tiene forma de historico de envios (
-            {shipmentTable.rows.length.toLocaleString(
-              'es-PE',
-            )}{' '}
-            filas). Puedes llenar el modulo de Envios con estos
-            datos reales.
-          </span>
+        <div className="mt-4 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--text-primary)]">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <span>
+              Este archivo tiene forma de historico de envios (
+              {shipmentTable.rows.length.toLocaleString(
+                'es-PE',
+              )}{' '}
+              filas). Puedes llenar el modulo de Envios con estos
+              datos reales.
+            </span>
 
-          <button
-            type="button"
-            disabled={importing}
-            onClick={() =>
-              void handleImportShipments()
-            }
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {importing ? (
-              <LoaderCircle
-                size={14}
-                className="animate-spin"
+            <button
+              type="button"
+              disabled={importing}
+              onClick={() =>
+                void handleImportShipments()
+              }
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {importing ? (
+                <LoaderCircle
+                  size={14}
+                  className="animate-spin"
+                />
+              ) : (
+                <Sparkles size={14} />
+              )}
+
+              {importing
+                ? `Importando ${importProgress?.imported.toLocaleString('es-PE') ?? 0} / ${importProgress?.total.toLocaleString('es-PE') ?? 0}...`
+                : 'Importar como Envios'}
+            </button>
+          </div>
+
+          {importing && importProgress && (
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10">
+              <div
+                className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+                style={{
+                  width: `${
+                    importProgress.total ===
+                    0
+                      ? 0
+                      : Math.round(
+                          (importProgress.imported /
+                            importProgress.total) *
+                            100,
+                        )
+                  }%`,
+                }}
               />
-            ) : (
-              <Sparkles size={14} />
-            )}
-
-            {importing
-              ? 'Importando...'
-              : 'Importar como Envios'}
-          </button>
+            </div>
+          )}
         </div>
       )}
 

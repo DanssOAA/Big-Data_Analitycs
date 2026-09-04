@@ -10,6 +10,12 @@ import {
 import { supabase } from '../services/supabaseClient'
 
 import type { AuthUser, UserRole } from '../types/auth.types'
+import {
+  emptyPermissions,
+  type AppModule,
+  type PermissionAction,
+  type PermissionMap,
+} from '../types/permission.types'
 
 interface LoginResult {
   success: boolean
@@ -25,6 +31,8 @@ interface AuthContextValue {
   ) => Promise<LoginResult>
   logout: () => Promise<void>
   isAdmin: boolean
+  permissions: PermissionMap
+  can: (module: AppModule, action?: PermissionAction) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -49,10 +57,10 @@ async function mapUser(
       .eq('id', supabaseUser.id)
       .maybeSingle()
 
-  const role =
-    profile?.role === 'admin'
-      ? 'admin'
-      : ('worker' as UserRole)
+  const role: UserRole =
+    profile?.role === 'admin' || profile?.role === 'analyst'
+      ? profile.role
+      : 'worker'
 
   const name =
     typeof profile?.full_name === 'string' &&
@@ -90,6 +98,40 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [permissions, setPermissions] = useState<PermissionMap>(emptyPermissions())
+
+  const loadPermissions = async (mappedUser: AuthUser | null) => {
+    const next = emptyPermissions()
+    if (!mappedUser) {
+      setPermissions(next)
+      return
+    }
+    if (mappedUser.role === 'admin') {
+      Object.values(next).forEach((module) =>
+        Object.keys(module).forEach((action) => {
+          module[action as PermissionAction] = true
+        }),
+      )
+      setPermissions(next)
+      return
+    }
+    const { data } = await supabase
+      .from('user_permissions')
+      .select('module, can_view, can_create, can_update, can_delete')
+      .eq('user_id', mappedUser.id)
+    for (const row of data ?? []) {
+      const module = row.module as AppModule
+      if (next[module]) {
+        next[module] = {
+          view: row.can_view,
+          create: row.can_create,
+          update: row.can_update,
+          delete: row.can_delete,
+        }
+      }
+    }
+    setPermissions(next)
+  }
 
   useEffect(() => {
     const { data: listener } =
@@ -99,7 +141,7 @@ export function AuthProvider({
             session?.user,
           ).then((mappedUser) => {
             setUser(mappedUser)
-            setLoading(false)
+            void loadPermissions(mappedUser).finally(() => setLoading(false))
           })
         },
       )
@@ -129,7 +171,9 @@ export function AuthProvider({
       }
     }
 
-    setUser(await mapUser(data.user))
+    const mappedUser = await mapUser(data.user)
+    setUser(mappedUser)
+    await loadPermissions(mappedUser)
 
     return { success: true }
   }
@@ -137,6 +181,7 @@ export function AuthProvider({
   const logout = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setPermissions(emptyPermissions())
   }
 
   const value = useMemo(
@@ -146,8 +191,11 @@ export function AuthProvider({
       login,
       logout,
       isAdmin: user?.role === 'admin',
+      permissions,
+      can: (module: AppModule, action: PermissionAction = 'view') =>
+        user?.role === 'admin' || permissions[module][action],
     }),
-    [user, loading],
+    [user, loading, permissions],
   )
 
   return (

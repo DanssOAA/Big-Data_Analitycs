@@ -4,18 +4,21 @@ import {
   Activity,
   BarChart3,
   Database,
+  FileText,
   LayoutDashboard,
   Package,
   ShoppingBag,
   Sparkles,
   Truck,
   Users,
+  UserCog,
   X,
 } from 'lucide-react'
 
 import { NavLink } from 'react-router'
 
 import { useAuth } from '../../context/AuthContext'
+import type { AppModule } from '../../types/permission.types'
 
 interface SidebarProps {
   open: boolean
@@ -27,6 +30,7 @@ interface MenuItem {
   path: string
   icon: LucideIcon
   end?: boolean
+  module?: AppModule
 }
 
 const crmItems: MenuItem[] = [
@@ -34,31 +38,37 @@ const crmItems: MenuItem[] = [
     label: 'Dashboard',
     path: '/app/dashboard',
     icon: LayoutDashboard,
+    module: 'dashboard',
   },
   {
     label: 'Clientes',
     path: '/app/clientes',
     icon: Users,
+    module: 'clients',
   },
   {
     label: 'Ventas',
     path: '/app/ventas',
     icon: ShoppingBag,
+    module: 'sales',
   },
   {
     label: 'Productos',
     path: '/app/productos',
     icon: Package,
+    module: 'products',
   },
   {
     label: 'Envios',
     path: '/app/envios',
     icon: Truck,
+    module: 'shipments',
   },
   {
     label: 'Actividades',
     path: '/app/actividades',
     icon: Activity,
+    module: 'activities',
   },
 ]
 
@@ -68,6 +78,7 @@ const adminItems: MenuItem[] = [
     path: '/admin/insights',
     icon: Database,
   },
+  { label: 'Usuarios y permisos', path: '/admin/usuarios', icon: UserCog },
 ]
 
 const workerItems: MenuItem[] = [
@@ -76,8 +87,13 @@ const workerItems: MenuItem[] = [
     path: '/app/insights',
     icon: Sparkles,
     end: true,
+    module: 'insights',
   },
 ]
+
+const documentationItem: MenuItem = {
+  label: 'Documentación', path: '/app/documentacion', icon: FileText, module: 'documentation',
+}
 
 function MenuLink({
   item,
@@ -125,7 +141,8 @@ export default function Sidebar({
   open,
   onClose,
 }: SidebarProps) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, can } = useAuth()
+  const visibleCrmItems = crmItems.filter((item) => !item.module || can(item.module))
 
   return (
     <>
@@ -171,7 +188,7 @@ export default function Sidebar({
           </p>
 
           <div className="space-y-1">
-            {crmItems.map((item) => (
+            {visibleCrmItems.map((item) => (
               <MenuLink
                 key={item.path}
                 item={item}
@@ -179,6 +196,8 @@ export default function Sidebar({
               />
             ))}
           </div>
+
+          {can('documentation') && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Archivos</p><MenuLink item={documentationItem} onClick={onClose} /></>}
 
           <p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
             {isAdmin ? 'Datos' : 'Analisis'}

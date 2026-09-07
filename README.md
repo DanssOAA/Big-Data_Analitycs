@@ -73,3 +73,16 @@ export default defineConfig([
 ])
 
 ```
+## Alta de usuarios desde el panel administrativo
+
+El formulario de **Administración → Usuarios y permisos** utiliza la Edge Function
+`create-user`. Despliégala en el proyecto de Supabase antes de usar el formulario:
+
+```bash
+supabase functions deploy create-user
+```
+
+Supabase proporciona automáticamente `SUPABASE_URL` y
+`SUPABASE_SERVICE_ROLE_KEY` a la función. La clave de servicio nunca debe añadirse
+a las variables `VITE_*` ni exponerse en el navegador. La función valida la sesión
+y comprueba en `profiles` que el solicitante tenga el rol `admin`.

@@ -13,7 +13,12 @@ const size = (bytes: number) => bytes < 1024 * 1024
 
 export default function DocumentationPage() {
   const { can } = useAuth()
-  const [tab, setTab] = useState<'documentos' | 'proyectos'>('documentos')
+  const canDocs = can('documentation')
+  const canProjects = can('doc_projects')
+  // Alguien con acceso solo a Proyectos (sin "documentation") debe arrancar
+  // directo ahí -- no tiene sentido abrir por defecto una pestaña que no
+  // puede ver.
+  const [tab, setTab] = useState<'documentos' | 'proyectos'>(canDocs ? 'documentos' : 'proyectos')
   const [openProjectCreateSignal, setOpenProjectCreateSignal] = useState(0)
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +34,9 @@ export default function DocumentationPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
+    if (!canDocs) { setLoading(false); return }
     void getDocuments().then(setDocuments).catch(() => setError('No se pudo cargar la documentación.')).finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const close = () => { setModal(null); setSelected(null); setFile(null); setName(''); setDescription(''); setError('') }
@@ -95,12 +102,12 @@ export default function DocumentationPage() {
       </div>
     </section>
 
-    {can('doc_projects') && <div className="flex gap-2 border-b border-[var(--border-soft)]">
+    {canDocs && canProjects && <div className="flex gap-2 border-b border-[var(--border-soft)]">
       <button type="button" onClick={() => setTab('documentos')} className={`flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${tab === 'documentos' ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}><FileText size={16}/> Documentos</button>
       <button type="button" onClick={() => setTab('proyectos')} className={`flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${tab === 'proyectos' ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}><FolderKanban size={16}/> Proyectos</button>
     </div>}
 
-    {tab === 'proyectos' ? <DocumentationProjectsPanel openCreateSignal={openProjectCreateSignal} /> : <>
+    {tab === 'proyectos' && canProjects ? <DocumentationProjectsPanel openCreateSignal={openProjectCreateSignal} /> : canDocs ? <>
     {error && !modal && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">{error}</div>}
     <section className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
       {loading ? <p className="p-10 text-center text-sm text-[var(--text-muted)]">Cargando documentos...</p>
@@ -141,6 +148,6 @@ export default function DocumentationPage() {
       </div>
       <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={close} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button disabled={busy} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Guardando...' : 'Guardar'}</button></div>
     </form></div>}
-    </>}
+    </> : null}
   </div>
 }

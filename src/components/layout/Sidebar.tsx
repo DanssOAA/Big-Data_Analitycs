@@ -216,7 +216,7 @@ export default function Sidebar({
             ))}
           </div>
 
-          {can('documentation') && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Archivos</p><MenuLink item={documentationItem} onClick={onClose} /></>}
+          {(can('documentation') || can('doc_projects')) && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Archivos</p><MenuLink item={documentationItem} onClick={onClose} /></>}
 
           {can('audit') && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Seguridad</p><MenuLink item={auditItem} onClick={onClose} /></>}
 

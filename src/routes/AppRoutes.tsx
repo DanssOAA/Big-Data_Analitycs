@@ -99,11 +99,12 @@ function AdminRoute({
   return children
 }
 
-function PermissionRoute({ children, module }: { children: ReactNode; module: AppModule }) {
+function PermissionRoute({ children, module }: { children: ReactNode; module: AppModule | AppModule[] }) {
   const { user, loading, can } = useAuth()
   if (loading) return <FullScreenLoader />
   if (!user) return <Navigate to="/login" replace />
-  if (!can(module)) return <Navigate to="/app/sin-acceso" replace />
+  const allowed = Array.isArray(module) ? module.some((item) => can(item)) : can(module)
+  if (!allowed) return <Navigate to="/app/sin-acceso" replace />
   return children
 }
 
@@ -213,7 +214,7 @@ export default function AppRoutes() {
             </PermissionRoute>
           }
         />
-        <Route path="documentacion" element={<PermissionRoute module="documentation"><DocumentationPage /></PermissionRoute>} />
+        <Route path="documentacion" element={<PermissionRoute module={['documentation', 'doc_projects']}><DocumentationPage /></PermissionRoute>} />
         <Route path="documentacion/proyectos/:projectId" element={<PermissionRoute module="doc_projects"><DocumentationProjectDetailPage /></PermissionRoute>} />
         <Route path="documentacion/invitaciones/:inviteId" element={<DocumentationInviteAcceptPage />} />
         <Route path="auditoria" element={<PermissionRoute module="audit"><AuditPage /></PermissionRoute>} />

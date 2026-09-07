@@ -6,6 +6,7 @@ import {
   Database,
   FileText,
   FolderOpen,
+  History,
   LayoutDashboard,
   Package,
   ShoppingBag,
@@ -101,6 +102,10 @@ const projectsItem: MenuItem = {
 
 const documentationItem: MenuItem = {
   label: 'Documentación', path: '/app/documentacion', icon: FileText, module: 'documentation',
+}
+
+const auditItem: MenuItem = {
+  label: 'Auditoría', path: '/app/auditoria', icon: History, module: 'audit',
 }
 
 function MenuLink({
@@ -219,6 +224,8 @@ export default function Sidebar({
           </div>
 
           {can('documentation') && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Archivos</p><MenuLink item={documentationItem} onClick={onClose} /></>}
+
+          {can('audit') && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Seguridad</p><MenuLink item={auditItem} onClick={onClose} /></>}
 
           <p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
             {isAdmin ? 'Datos' : 'Analisis'}

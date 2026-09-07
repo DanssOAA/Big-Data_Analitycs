@@ -29,6 +29,8 @@ import ProjectSettingsPage from '../pages/projects/ProjectSettingsPage'
 
 import WorkerInsightsPage from '../pages/worker/WorkerInsightsPage'
 import DocumentationPage from '../pages/documentation/DocumentationPage'
+import DocumentationProjectDetailPage from '../pages/documentation/DocumentationProjectDetailPage'
+import AuditPage from '../pages/audit/AuditPage'
 import type { AppModule } from '../types/permission.types'
 
 function FullScreenLoader() {
@@ -211,6 +213,8 @@ export default function AppRoutes() {
           }
         />
         <Route path="documentacion" element={<PermissionRoute module="documentation"><DocumentationPage /></PermissionRoute>} />
+        <Route path="documentacion/proyectos/:projectId" element={<PermissionRoute module="doc_projects"><DocumentationProjectDetailPage /></PermissionRoute>} />
+        <Route path="auditoria" element={<PermissionRoute module="audit"><AuditPage /></PermissionRoute>} />
         <Route path="sin-acceso" element={<NoAccessPage />} />
         <Route path="proyectos" element={<ProjectsPage />} />
         <Route path="proyectos/:projectId/configuracion" element={<ProjectSettingsPage />} />

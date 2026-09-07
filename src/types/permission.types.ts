@@ -1,6 +1,6 @@
 export const modules = [
   'dashboard', 'clients', 'sales', 'products', 'shipments',
-  'activities', 'insights', 'documentation',
+  'activities', 'insights', 'documentation', 'doc_projects', 'audit',
 ] as const
 
 export const actions = ['view', 'create', 'update', 'delete'] as const

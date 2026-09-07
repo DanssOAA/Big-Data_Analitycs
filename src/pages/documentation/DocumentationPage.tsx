@@ -1,6 +1,7 @@
-import { ExternalLink, Eye, FilePenLine, FileText, Plus, Trash2, Upload, X } from 'lucide-react'
+import { ExternalLink, Eye, FilePenLine, FileText, FolderKanban, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import DocumentationProjectsPanel from './DocumentationProjectsPanel'
 import {
   deleteDocument, getDocuments, getDocumentUrl, updateDocument, uploadDocument,
   type DocumentRecord,
@@ -12,6 +13,8 @@ const size = (bytes: number) => bytes < 1024 * 1024
 
 export default function DocumentationPage() {
   const { can } = useAuth()
+  const [tab, setTab] = useState<'documentos' | 'proyectos'>('documentos')
+  const [openProjectCreateSignal, setOpenProjectCreateSignal] = useState(0)
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -84,11 +87,20 @@ export default function DocumentationPage() {
       <div>
         <p className="text-sm font-medium text-[var(--accent)]">Archivos</p>
         <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Documentación</h2>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">Consulta y administra los documentos PDF del sistema.</p>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">{tab === 'documentos' ? 'Consulta y administra los documentos PDF del sistema.' : 'Organiza avances por proyecto, con historial de versiones y vista previa con IA.'}</p>
       </div>
-      {can('documentation', 'create') && <button type="button" onClick={() => setModal('upload')} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}
+      <div className="flex flex-wrap gap-2">
+        {can('documentation', 'create') && <button type="button" onClick={() => { setTab('documentos'); setModal('upload') }} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}
+        {can('doc_projects', 'create') && <button type="button" onClick={() => { setTab('proyectos'); setOpenProjectCreateSignal((value) => value + 1) }} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent)]"><FolderKanban size={17}/> Crear proyecto</button>}
+      </div>
     </section>
 
+    {can('doc_projects') && <div className="flex gap-2 border-b border-[var(--border-soft)]">
+      <button type="button" onClick={() => setTab('documentos')} className={`flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${tab === 'documentos' ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}><FileText size={16}/> Documentos</button>
+      <button type="button" onClick={() => setTab('proyectos')} className={`flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${tab === 'proyectos' ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}><FolderKanban size={16}/> Proyectos</button>
+    </div>}
+
+    {tab === 'proyectos' ? <DocumentationProjectsPanel openCreateSignal={openProjectCreateSignal} /> : <>
     {error && !modal && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">{error}</div>}
     <section className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
       {loading ? <p className="p-10 text-center text-sm text-[var(--text-muted)]">Cargando documentos...</p>
@@ -129,5 +141,6 @@ export default function DocumentationPage() {
       </div>
       <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={close} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm">Cancelar</button><button disabled={busy} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Guardando...' : 'Guardar'}</button></div>
     </form></div>}
+    </>}
   </div>
 }

@@ -6,8 +6,9 @@
 --    persona" al invitar miembros a un proyecto de documentación.
 -- 2. documentation_milestone_versions.ai_diff_summary: resumen generado por
 --    la IA de qué cambió entre una versión y la anterior del mismo avance
---    (lo llena la Edge Function analyze-document; queda vacío en la v1 de
---    cada avance, porque ahí no hay versión anterior con la que comparar).
+--    (lo llena el análisis con IA que corre en el navegador, mismo patrón
+--    que src/services/aiInsights.service.ts; queda vacío en la v1 de cada
+--    avance, porque ahí no hay versión anterior con la que comparar).
 --
 -- Aplicar en Supabase Dashboard -> SQL Editor -> Run. Es idempotente.
 

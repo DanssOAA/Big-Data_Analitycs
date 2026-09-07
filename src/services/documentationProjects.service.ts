@@ -5,6 +5,8 @@ export type DocProjectRole = 'editor' | 'viewer'
 export type MilestoneStatus = 'pendiente' | 'en_progreso' | 'hecho'
 
 const BUCKET = 'documentation-projects'
+// Mismo modelo que usa src/services/aiInsights.service.ts.
+const GEMINI_MODEL = 'gemini-3.6-flash'
 
 export interface DocumentationProject {
   id: string
@@ -292,11 +294,117 @@ export async function uploadVersion(
     throw toError(error)
   }
 
-  // El análisis con IA corre aparte y no debe bloquear la subida: si falla
-  // (Gemini caído, secret sin configurar, etc.) la versión ya quedó guardada.
-  void supabase.functions.invoke('analyze-document', { body: { versionId: data.id } }).catch(() => undefined)
+  // El análisis con IA corre aparte, en el navegador (misma VITE_GEMINI_API_KEY
+  // que ya usa el módulo de Insights), y no debe bloquear la subida: si
+  // falla (sin key configurada, Gemini caído, etc.) la versión ya quedó
+  // guardada igual.
+  void analyzeVersionWithAI(data as DocMilestoneVersion).catch(() => undefined)
 
   return data as DocMilestoneVersion
+}
+
+// Codifica en base64 por bloques: convertir un archivo de hasta 20MB entero
+// con String.fromCharCode(...bytes) de una sola vez puede exceder el
+// límite de argumentos del motor de JS.
+function toBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function downloadAsBase64(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(path)
+  if (error || !data) return null
+  return toBase64(await data.arrayBuffer())
+}
+
+/**
+ * Analiza el PDF recién subido con Gemini directamente desde el navegador
+ * (igual patrón que aiInsights.service.ts): idea principal + palabras
+ * clave, y si existe una versión anterior del mismo avance, además un
+ * resumen de qué cambió entre una y otra. Es best-effort: cualquier fallo
+ * se ignora en silencio, la versión ya quedó guardada de todos modos.
+ */
+async function analyzeVersionWithAI(version: DocMilestoneVersion): Promise<void> {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+  if (!apiKey) return
+
+  const currentBase64 = await downloadAsBase64(version.file_path)
+  if (!currentBase64) return
+
+  const { data: previousVersion } = await supabase
+    .from('documentation_milestone_versions')
+    .select('file_path')
+    .eq('milestone_id', version.milestone_id)
+    .lt('version_number', version.version_number)
+    .is('deleted_at', null)
+    .order('version_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const previousBase64 = previousVersion ? await downloadAsBase64(previousVersion.file_path) : null
+
+  const prompt = previousBase64
+    ? `Eres un asistente que resume documentos internos de una empresa. Se te adjuntan DOS versiones del mismo documento: primero la ANTERIOR y después la NUEVA. Responde EXCLUSIVAMENTE con un objeto JSON (sin texto adicional, sin markdown) con esta forma exacta:
+{
+  "summary": "idea principal de la versión NUEVA en una o dos frases, en español",
+  "keywords": ["palabra clave 1", "palabra clave 2"],
+  "diffSummary": "qué cambió respecto a la versión anterior, en un párrafo breve y claro para alguien de negocio, en español. Si no hay diferencias relevantes, dilo explícitamente"
+}
+Máximo 8 palabras clave, en minúsculas.`
+    : `Eres un asistente que resume documentos internos de una empresa. Lee el PDF adjunto y responde EXCLUSIVAMENTE con un objeto JSON (sin texto adicional, sin markdown) con esta forma exacta:
+{
+  "summary": "idea principal del documento en una o dos frases, en español",
+  "keywords": ["palabra clave 1", "palabra clave 2"]
+}
+Máximo 8 palabras clave, en minúsculas.`
+
+  const documentParts = previousBase64
+    ? [
+      { inlineData: { mimeType: 'application/pdf', data: previousBase64 } },
+      { inlineData: { mimeType: 'application/pdf', data: currentBase64 } },
+    ]
+    : [{ inlineData: { mimeType: 'application/pdf', data: currentBase64 } }]
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }, ...documentParts] }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+      }),
+    },
+  )
+  if (!response.ok) return
+
+  const payload = await response.json()
+  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) return
+
+  let parsed: { summary?: unknown; keywords?: unknown; diffSummary?: unknown }
+  try {
+    const fenced = String(text).trim().match(/```(?:json)?\s*([\s\S]*?)```/i)
+    parsed = JSON.parse(fenced ? fenced[1] : String(text).trim())
+  } catch {
+    return
+  }
+
+  const summary = typeof parsed.summary === 'string' ? parsed.summary : null
+  const keywords = Array.isArray(parsed.keywords)
+    ? parsed.keywords.filter((keyword): keyword is string => typeof keyword === 'string').slice(0, 8)
+    : []
+  const diffSummary = typeof parsed.diffSummary === 'string' ? parsed.diffSummary : null
+
+  await supabase
+    .from('documentation_milestone_versions')
+    .update({ ai_summary: summary, ai_keywords: keywords, ai_diff_summary: diffSummary, ai_analyzed_at: new Date().toISOString() })
+    .eq('id', version.id)
 }
 
 export async function getVersionUrl(version: DocMilestoneVersion): Promise<string> {

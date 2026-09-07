@@ -4,17 +4,24 @@ import { supabase } from '../../services/supabaseClient'
 import { actions, emptyPermissions, modules, type AppModule, type PermissionAction, type PermissionMap } from '../../types/permission.types'
 import type { UserRole } from '../../types/auth.types'
 
-interface Profile { id: string; email: string; full_name: string | null; role: UserRole }
+interface Profile { id: string; email: string; full_name: string | null; role: UserRole; area: string | null }
 
 const moduleLabels: Record<AppModule, string> = {
   dashboard: 'Dashboard', clients: 'Clientes', sales: 'Ventas', products: 'Productos',
   shipments: 'Envíos', activities: 'Actividades', insights: 'Insights', documentation: 'Documentación',
+  doc_projects: 'Proyectos de documentación', audit: 'Auditoría',
 }
 const actionLabels: Record<PermissionAction, string> = { view: 'Ver', create: 'Crear / subir', update: 'Editar', delete: 'Eliminar' }
 
 const initialUserPermissions = (): PermissionMap => {
   const permissions = emptyPermissions()
   for (const module of modules) {
+    // "audit" nunca se activa por defecto: nadie salvo el administrador ve
+    // la auditoría hasta que se le otorgue el permiso explícitamente.
+    if (module === 'audit') {
+      permissions[module] = { view: false, create: false, update: false, delete: false }
+      continue
+    }
     const canManage = ['clients', 'sales', 'products', 'shipments', 'activities'].includes(module)
     permissions[module] = { view: true, create: canManage, update: canManage, delete: false }
   }
@@ -78,6 +85,19 @@ export default function UsersPage() {
     setSaving('')
   }
 
+  // Área/función dentro de la empresa (texto libre, ej. "Ventas",
+  // "Logística"). Se usa para agrupar el selector al invitar personas a un
+  // proyecto de documentación.
+  const changeArea = async (user: Profile, area: string) => {
+    const trimmed = area.trim() || null
+    if (trimmed === user.area) return
+    setSaving(user.id); setMessage('')
+    const { error } = await supabase.from('profiles').update({ area: trimmed }).eq('id', user.id)
+    if (error) setMessage('No se pudo guardar el área.')
+    else setUsers((current) => current.map((item) => item.id === user.id ? { ...item, area: trimmed } : item))
+    setSaving('')
+  }
+
   const toggle = async (userId: string, module: AppModule, action: PermissionAction) => {
     const current = permissions[userId]?.[module] ?? emptyPermissions()[module]
     const updated = { ...current, [action]: !current[action] }
@@ -115,6 +135,7 @@ export default function UsersPage() {
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-[var(--text-secondary)]">{user.role === 'admin' ? <ShieldCheck size={18}/> : <UserCog size={18}/>}</div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-[var(--text-primary)]">{user.full_name ?? user.email}</p><p className="mt-1 truncate text-xs text-[var(--text-muted)]">{user.email}</p></div>
+          <input aria-label={`Área de ${user.email}`} defaultValue={user.area ?? ''} onBlur={(event) => void changeArea(user, event.target.value)} placeholder="Área (opcional)" disabled={saving === user.id} className="w-36 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"/>
           <select aria-label={`Rol de ${user.email}`} value={user.role} disabled={saving === user.id} onChange={(event) => void changeRole(user, event.target.value as UserRole)} className="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"><option value="admin">Administrador</option><option value="analyst">Analista</option><option value="worker">Trabajador</option></select>
           {user.role !== 'admin' && <button type="button" onClick={() => setExpanded(expanded === user.id ? null : user.id)} className="flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-secondary)]">Permisos {expanded === user.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</button>}
         </div>

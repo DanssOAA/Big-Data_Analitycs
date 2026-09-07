@@ -32,6 +32,7 @@ import type {
   DatasetSourceType,
 } from '../../types/dataset.types'
 import type { InsightRecord } from '../../types/insight.types'
+import { useProject } from '../../context/ProjectContext'
 
 export default function InsightsExplorerPage() {
   const [datasets, setDatasets] = useState<DatasetRecord[]>([])
@@ -49,11 +50,13 @@ export default function InsightsExplorerPage() {
 
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const { activeProject } = useProject()
+
   const loadDatasets = async () => {
     try {
       const [stored, storedInsights] =
         await Promise.all([
-          getDatasets(),
+          getDatasets(activeProject?.id ?? null),
           listInsights(),
         ])
 
@@ -68,7 +71,7 @@ export default function InsightsExplorerPage() {
 
   useEffect(() => {
     void loadDatasets()
-  }, [])
+  }, [activeProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const processFiles = async (
     files: FileList | File[],
@@ -90,7 +93,7 @@ export default function InsightsExplorerPage() {
       try {
         await uploadDataset(
           file,
-          newDatasetSourceType,
+          { sourceType: newDatasetSourceType, projectId: activeProject?.id ?? null },
         )
 
         created.push(file.name)

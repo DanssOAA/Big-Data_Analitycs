@@ -59,6 +59,8 @@ export interface DatasetRecord {
   totalColumns: number
   storagePath?: string | null
   sourceType: DatasetSourceType
+  /** ID del proyecto al que pertenece este dataset. null = sin proyecto asignado. */
+  projectId?: string | null
 
   /**
    * true si `tables[].rows` no trae todas las filas de la base

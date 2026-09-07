@@ -24,6 +24,9 @@ import DatasetDetailPage from '../pages/insights/DatasetDetailPage'
 import InsightDetailPage from '../pages/insights/InsightDetailPage'
 import InsightsExplorerPage from '../pages/insights/InsightsExplorerPage'
 
+import ProjectsPage from '../pages/projects/ProjectsPage'
+import ProjectSettingsPage from '../pages/projects/ProjectSettingsPage'
+
 import WorkerInsightsPage from '../pages/worker/WorkerInsightsPage'
 import DocumentationPage from '../pages/documentation/DocumentationPage'
 import type { AppModule } from '../types/permission.types'
@@ -209,6 +212,8 @@ export default function AppRoutes() {
         />
         <Route path="documentacion" element={<PermissionRoute module="documentation"><DocumentationPage /></PermissionRoute>} />
         <Route path="sin-acceso" element={<NoAccessPage />} />
+        <Route path="proyectos" element={<ProjectsPage />} />
+        <Route path="proyectos/:projectId/configuracion" element={<ProjectSettingsPage />} />
       </Route>
 
       <Route

@@ -48,6 +48,7 @@ import type {
   DatasetRecord,
   DatasetTable,
 } from '../../types/dataset.types'
+import { useProject } from '../../context/ProjectContext'
 
 type ViewMode =
   | 'dashboard'
@@ -61,6 +62,8 @@ export default function DatasetDetailPage() {
     useParams()
 
   const navigate = useNavigate()
+
+  const { activeProject } = useProject()
 
   const [
     dataset,
@@ -121,7 +124,7 @@ export default function DatasetDetailPage() {
         const [result, allDatasets] =
           await Promise.all([
             getDataset(datasetId),
-            getDatasets(),
+            getDatasets(activeProject?.id ?? null),
           ])
 
         if (result) {

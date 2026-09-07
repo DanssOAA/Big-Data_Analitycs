@@ -12,6 +12,12 @@ import type {
   DatasetTable,
 } from '../types/dataset.types'
 
+// project_id es opcional: si se pasa, el dataset queda asociado a ese proyecto
+export type DatasetUploadOptions = {
+  sourceType?: DatasetSourceType
+  projectId?: string | null
+}
+
 const STORAGE_BUCKET = 'datasets'
 
 /**
@@ -34,6 +40,7 @@ interface DatasetRow_ {
   total_rows: number
   total_columns: number
   source_type: DatasetSourceType
+  project_id: string | null
 }
 
 interface DatasetTableRow {
@@ -78,6 +85,7 @@ function toDatasetRecord(
     createdAt: row.created_at,
     storagePath: row.storage_path,
     sourceType: row.source_type,
+    projectId: row.project_id ?? null,
     totalRows: row.total_rows,
     totalColumns:
       row.total_columns,
@@ -89,7 +97,24 @@ function toDatasetRecord(
 export async function uploadDataset(
   file: File,
   sourceType: DatasetSourceType = 'external',
+): Promise<DatasetRecord>
+export async function uploadDataset(
+  file: File,
+  options: DatasetUploadOptions,
+): Promise<DatasetRecord>
+export async function uploadDataset(
+  file: File,
+  sourceTypeOrOptions: DatasetSourceType | DatasetUploadOptions = 'external',
 ): Promise<DatasetRecord> {
+  const sourceType: DatasetSourceType =
+    typeof sourceTypeOrOptions === 'string'
+      ? sourceTypeOrOptions
+      : (sourceTypeOrOptions.sourceType ?? 'external')
+  const projectId: string | null =
+    typeof sourceTypeOrOptions === 'string'
+      ? null
+      : (sourceTypeOrOptions.projectId ?? null)
+
   const parsed =
     await parseDatasetFile(file)
 
@@ -111,6 +136,7 @@ export async function uploadDataset(
         total_columns:
           parsed.totalColumns,
         source_type: sourceType,
+        project_id: projectId,
       })
 
   if (datasetError) {
@@ -179,6 +205,7 @@ export async function uploadDataset(
     ...parsed,
     storagePath: null,
     sourceType,
+    projectId,
     truncated: false,
   }
 }
@@ -231,16 +258,20 @@ async function fetchPreviewTable(
   }
 }
 
-export async function getDatasets(): Promise<
+export async function getDatasets(projectId?: string | null): Promise<
   DatasetRecord[]
 > {
-  const { data, error } =
-    await supabase
-      .from('datasets')
-      .select('*')
-      .order('created_at', {
-        ascending: false,
-      })
+  let query = supabase
+    .from('datasets')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  // Si se pasa projectId, filtramos por proyecto; null/undefined trae todos (admin global)
+  if (projectId !== undefined && projectId !== null) {
+    query = query.eq('project_id', projectId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw toError(error)

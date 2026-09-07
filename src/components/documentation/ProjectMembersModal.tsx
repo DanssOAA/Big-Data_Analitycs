@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { LoaderCircle, UserMinus, UserPlus, Users, X } from 'lucide-react'
-import type { DocProjectMember, DocProjectRole } from '../../services/documentationProjects.service'
+import { Clock, LoaderCircle, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import type { DocProjectInvite, DocProjectMember, DocProjectRole } from '../../services/documentationProjects.service'
 
 interface ProjectMembersModalProps {
   projectName: string
   members: DocProjectMember[]
+  invites?: DocProjectInvite[]
   isAdmin: boolean
   error?: string
   onClose: () => void
   onInvite: () => void
   onChangeRole: (member: DocProjectMember, role: DocProjectRole) => Promise<void>
   onRemove: (member: DocProjectMember) => Promise<void>
+  onCancelInvite?: (invite: DocProjectInvite) => Promise<void>
 }
 
 export default function ProjectMembersModal({
-  projectName, members, isAdmin, error, onClose, onInvite, onChangeRole, onRemove,
+  projectName, members, invites = [], isAdmin, error, onClose, onInvite, onChangeRole, onRemove, onCancelInvite,
 }: ProjectMembersModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -41,6 +43,19 @@ export default function ProjectMembersModal({
       await action()
     } catch {
       setActionError('No se pudo guardar el cambio. Inténtalo nuevamente.')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const runInviteAction = async (invite: DocProjectInvite, action: () => Promise<void>) => {
+    dialogRef.current?.focus()
+    setPendingId(invite.id)
+    setActionError('')
+    try {
+      await action()
+    } catch {
+      setActionError('No se pudo cancelar la invitación. Inténtalo nuevamente.')
     } finally {
       setPendingId(null)
     }
@@ -119,6 +134,30 @@ export default function ProjectMembersModal({
               </li>
             })}
           </ul>}
+
+          {isAdmin && invites.length > 0 && (
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Invitaciones pendientes</p>
+              <ul className="space-y-2">
+                {invites.map((invite) => (
+                  <li key={invite.id} className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-elevated)] p-3">
+                    <Clock size={16} className="shrink-0 text-amber-500" />
+                    <div className="min-w-0 flex-1">
+                      <p title={invite.email} className="truncate text-sm font-medium text-[var(--text-primary)]">{invite.email}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{invite.role === 'editor' ? 'Editor' : 'Lectura'} · esperando que acepte</p>
+                    </div>
+                    {onCancelInvite && (
+                      <button type="button" onClick={() => void runInviteAction(invite, () => onCancelInvite(invite))} disabled={pendingId !== null}
+                        aria-label={`Cancelar invitación a ${invite.email}`} title="Cancelar invitación"
+                        className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-rose-500 disabled:opacity-50">
+                        {pendingId === invite.id ? <LoaderCircle size={16} className="animate-spin" /> : <UserMinus size={16} />}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <footer className="flex shrink-0 justify-center border-t border-[var(--border-soft)] px-6 py-4">

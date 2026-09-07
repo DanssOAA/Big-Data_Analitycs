@@ -162,6 +162,77 @@ export async function listAllUsers(): Promise<DirectoryUser[]> {
   return (data ?? []) as DirectoryUser[]
 }
 
+export interface DocProjectInvite {
+  id: string
+  project_id: string
+  project_name: string
+  email: string
+  role: DocProjectRole
+  invited_by: string
+  invited_at: string
+  accepted_at: string | null
+}
+
+export async function listInvites(projectId: string): Promise<DocProjectInvite[]> {
+  const { data, error } = await supabase
+    .from('documentation_project_invites')
+    .select('*')
+    .eq('project_id', projectId)
+    .is('accepted_at', null)
+    .order('invited_at', { ascending: false })
+  if (error) throw toError(error)
+  return (data ?? []) as DocProjectInvite[]
+}
+
+/**
+ * Reemplaza el agregado directo: crea una invitación pendiente y le manda
+ * un correo real a la persona vía el "magic link" propio de Supabase Auth
+ * (no requiere ninguna Edge Function ni secret adicional). Al hacer click,
+ * Supabase la autentica y la redirige a la pantalla de aceptar/rechazar de
+ * esta app. `shouldCreateUser: false` asegura que solo funcione con
+ * correos que YA tienen cuenta en el sistema.
+ */
+export async function inviteMember(projectId: string, projectName: string, email: string, role: DocProjectRole): Promise<void> {
+  const { data: session } = await supabase.auth.getUser()
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const { data: invite, error } = await supabase
+    .from('documentation_project_invites')
+    .upsert({
+      project_id: projectId,
+      project_name: projectName,
+      email: normalizedEmail,
+      role,
+      invited_by: session.user?.id,
+    }, { onConflict: 'project_id,email' })
+    .select('id')
+    .single()
+  if (error) throw toError(error)
+
+  const redirectTo = `${window.location.origin}/app/documentacion/invitaciones/${invite.id}`
+  const { error: otpError } = await supabase.auth.signInWithOtp({
+    email: normalizedEmail,
+    options: { emailRedirectTo: redirectTo, shouldCreateUser: false },
+  })
+  if (otpError) throw toError(otpError)
+}
+
+export async function cancelInvite(inviteId: string): Promise<void> {
+  const { error } = await supabase.from('documentation_project_invites').delete().eq('id', inviteId)
+  if (error) throw toError(error)
+}
+
+export async function getInvite(inviteId: string): Promise<DocProjectInvite | null> {
+  const { data, error } = await supabase.from('documentation_project_invites').select('*').eq('id', inviteId).maybeSingle()
+  if (error) throw toError(error)
+  return data as DocProjectInvite | null
+}
+
+export async function acceptInvite(inviteId: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_documentation_project_invite', { invite_id: inviteId })
+  if (error) throw toError(error)
+}
+
 export async function addMember(projectId: string, userId: string, role: DocProjectRole): Promise<void> {
   const { data: session } = await supabase.auth.getUser()
   const { error } = await supabase.from('documentation_project_members').insert({

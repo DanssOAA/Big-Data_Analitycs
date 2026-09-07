@@ -10,11 +10,11 @@ import DoubleConfirmDeleteModal from '../../components/documentation/DoubleConfi
 import InviteExistingUserModal from '../../components/documentation/InviteExistingUserModal'
 import ProjectMembersModal from '../../components/documentation/ProjectMembersModal'
 import {
-  addMember, createMilestone, deleteMilestone, getProject, getVersionUrl, listMembers, listMilestones,
-  listVersions, purgeVersion, removeMember, restoreVersion, softDeleteVersion, updateMemberRole,
-  updateMilestoneStatus, uploadVersion,
-  type DocMilestone, type DocMilestoneVersion, type DocProjectMember, type DocProjectRole,
-  type DocumentationProject, type MilestoneStatus,
+  cancelInvite, createMilestone, deleteMilestone, getProject, getVersionUrl, inviteMember, listInvites,
+  listMembers, listMilestones, listVersions, purgeVersion, removeMember, restoreVersion, softDeleteVersion,
+  updateMemberRole, updateMilestoneStatus, uploadVersion,
+  type DirectoryUser, type DocMilestone, type DocMilestoneVersion, type DocProjectInvite, type DocProjectMember,
+  type DocProjectRole, type DocumentationProject, type MilestoneStatus,
 } from '../../services/documentationProjects.service'
 
 const statusMeta: Record<MilestoneStatus, { label: string; icon: typeof Circle; className: string }> = {
@@ -31,6 +31,7 @@ export default function DocumentationProjectDetailPage() {
 
   const [project, setProject] = useState<DocumentationProject | null>(null)
   const [members, setMembers] = useState<DocProjectMember[]>([])
+  const [invites, setInvites] = useState<DocProjectInvite[]>([])
   const [milestones, setMilestones] = useState<DocMilestone[]>([])
   const [versionsByMilestone, setVersionsByMilestone] = useState<Record<string, DocMilestoneVersion[]>>({})
   const [loading, setLoading] = useState(true)
@@ -61,14 +62,16 @@ export default function DocumentationProjectDetailPage() {
     setLoading(true)
     setError('')
     try {
-      const [projectData, memberData, milestoneData] = await Promise.all([
+      const [projectData, memberData, milestoneData, inviteData] = await Promise.all([
         getProject(projectId),
         listMembers(projectId),
         listMilestones(projectId),
+        isAdmin ? listInvites(projectId) : Promise.resolve([]),
       ])
       setProject(projectData)
       setMembers(memberData)
       setMilestones(milestoneData)
+      setInvites(inviteData)
       const versionEntries = await Promise.all(
         milestoneData.map(async (milestone) => [milestone.id, await listVersions(milestone.id)] as const),
       )
@@ -264,18 +267,28 @@ export default function DocumentationProjectDetailPage() {
     setPreviewUrl('')
   }
 
-  const addExistingUser = async (userId: string, role: DocProjectRole) => {
+  const inviteExistingUser = async (candidate: DirectoryUser, role: DocProjectRole) => {
+    if (!project) return
     setBusy(true)
     setError('')
     try {
-      await addMember(projectId, userId, role)
-      setMembers(await listMembers(projectId))
+      await inviteMember(projectId, project.name, candidate.email, role)
+      setInvites(await listInvites(projectId))
       setShowInvite(false)
-    } catch {
-      setError('No se pudo agregar a la persona.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo enviar la invitación.')
       setShowInvite(false)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const removeInvite = async (invite: DocProjectInvite) => {
+    try {
+      await cancelInvite(invite.id)
+      setInvites((current) => current.filter((item) => item.id !== invite.id))
+    } catch {
+      setError('No se pudo cancelar la invitación.')
     }
   }
 
@@ -632,6 +645,7 @@ export default function DocumentationProjectDetailPage() {
         <ProjectMembersModal
           projectName={project.name}
           members={members}
+          invites={invites}
           isAdmin={isAdmin}
           error={error}
           onClose={() => setShowMembers(false)}
@@ -644,15 +658,17 @@ export default function DocumentationProjectDetailPage() {
             await removeMember(projectId, member.user_id)
             setMembers(current => current.filter(item => item.user_id !== member.user_id))
           }}
+          onCancelInvite={removeInvite}
         />
       )}
 
       {showInvite && (
         <InviteExistingUserModal
           existingMemberIds={members.map((member) => member.user_id)}
+          pendingEmails={invites.map((invite) => invite.email)}
           busy={busy}
           onCancel={() => setShowInvite(false)}
-          onAdd={(userId, role) => void addExistingUser(userId, role)}
+          onAdd={(candidate, role) => void inviteExistingUser(candidate, role)}
         />
       )}
 

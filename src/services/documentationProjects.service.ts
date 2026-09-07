@@ -130,7 +130,9 @@ export async function updateProject(id: string, name: string, description: strin
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const { error } = await supabase.from('documentation_projects').delete().eq('id', id)
+  // A delete blocked by RLS can affect zero rows without an error.
+  // Require the deleted row before removing the project from the UI.
+  const { error } = await supabase.from('documentation_projects').delete().eq('id', id).select('id').single()
   if (error) throw toError(error)
 }
 

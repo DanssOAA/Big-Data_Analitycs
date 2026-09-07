@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { FolderKanban, Plus, Users, X } from 'lucide-react'
+import { FolderKanban, Plus, Trash2, Users, X } from 'lucide-react'
 import { Link } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
-import { createProject, listProjects, type DocumentationProject } from '../../services/documentationProjects.service'
+import { createProject, deleteProject, listProjects, type DocumentationProject } from '../../services/documentationProjects.service'
+import DoubleConfirmDeleteModal from '../../components/documentation/DoubleConfirmDeleteModal'
 
 interface DocumentationProjectsPanelProps {
   // Se incrementa desde el botón "Crear proyecto" del encabezado de
@@ -12,7 +13,7 @@ interface DocumentationProjectsPanelProps {
 }
 
 export default function DocumentationProjectsPanel({ openCreateSignal }: DocumentationProjectsPanelProps) {
-  const { can } = useAuth()
+  const { can, isAdmin } = useAuth()
   const [projects, setProjects] = useState<DocumentationProject[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -20,6 +21,9 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<DocumentationProject | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     void listProjects()
@@ -53,6 +57,21 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
     }
   }
 
+  const confirmDelete = async () => {
+    if (!deleteTarget || !isAdmin || deleting) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteProject(deleteTarget.id)
+      setProjects(current => current.filter(project => project.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } catch {
+      setDeleteError('No se pudo eliminar el proyecto. Revisa tu conexión y tus permisos e inténtalo nuevamente.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -82,11 +101,12 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
           {projects.map((project) => {
             const progress = project.milestoneCount ? Math.round(((project.doneCount ?? 0) / project.milestoneCount) * 100) : 0
             return (
-              <Link
+              <article
                 key={project.id}
-                to={`/app/documentacion/proyectos/${project.id}`}
-                className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] p-5 transition hover:border-[var(--accent)]"
+                className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] transition hover:border-[var(--accent)]"
               >
+                <Link to={`/app/documentacion/proyectos/${project.id}`}
+                  className="block flex-1 rounded-2xl p-5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="truncate font-semibold text-[var(--text-primary)]">{project.name}</h3>
                   {project.myRole && (
@@ -103,10 +123,30 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
                   <span>{project.doneCount ?? 0}/{project.milestoneCount ?? 0} documentos</span>
                   <span className="flex items-center gap-1"><Users size={12} />{project.memberCount ?? 0}</span>
                 </div>
-              </Link>
+                </Link>
+                {isAdmin && <div className="flex justify-end border-t border-[var(--border-soft)] px-3 py-2">
+                  <button type="button" aria-label={`Eliminar proyecto ${project.name}`} aria-haspopup="dialog"
+                    onClick={() => { setDeleteError(''); setDeleteTarget(project) }}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-rose-500 transition hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-rose-500">
+                    <Trash2 size={15} /> Eliminar
+                  </button>
+                </div>}
+              </article>
             )
           })}
         </div>
+      )}
+
+      {deleteTarget && (
+        <DoubleConfirmDeleteModal
+          key={deleteTarget.id}
+          itemLabel={`proyecto ${deleteTarget.name}`}
+          description="Se eliminarán el proyecto, sus documentos, el historial de versiones y los accesos de sus miembros. Esta acción no se puede deshacer. Las cuentas de los usuarios se conservarán."
+          busy={deleting}
+          error={deleteError}
+          onCancel={() => { if (!deleting) setDeleteTarget(null) }}
+          onConfirm={() => void confirmDelete()}
+        />
       )}
 
       {showCreate && (

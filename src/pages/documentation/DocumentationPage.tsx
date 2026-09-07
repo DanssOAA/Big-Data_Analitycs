@@ -87,7 +87,7 @@ export default function DocumentationPage() {
       <div>
         <p className="text-sm font-medium text-[var(--accent)]">Archivos</p>
         <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Documentación</h2>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">{tab === 'documentos' ? 'Consulta y administra los documentos PDF del sistema.' : 'Organiza avances por proyecto, con historial de versiones y vista previa con IA.'}</p>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">{tab === 'documentos' ? 'Consulta y administra los documentos PDF del sistema.' : 'Organiza documentos por proyecto, con historial de versiones y comparación con IA.'}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {can('documentation', 'create') && <button type="button" onClick={() => { setTab('documentos'); setModal('upload') }} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}

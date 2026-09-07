@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
-  ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardList, Clock, FileText,
-  GitCompare, History, Plus, Sparkles, Trash2, Upload, UserMinus, UserPlus, X,
+  ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardList, Clock, ExternalLink, FileText,
+  GitCompare, History, Sparkles, Trash2, Upload, UserMinus, UserPlus, X,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabaseClient'
@@ -36,9 +36,10 @@ export default function DocumentationProjectDetailPage() {
   const [error, setError] = useState('')
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null)
   const [showInvite, setShowInvite] = useState(false)
-  const [showNewMilestone, setShowNewMilestone] = useState(false)
-  const [milestoneTitle, setMilestoneTitle] = useState('')
-  const [milestoneDescription, setMilestoneDescription] = useState('')
+  const [showNewDoc, setShowNewDoc] = useState(false)
+  const [newDocTitle, setNewDocTitle] = useState('')
+  const [newDocDescription, setNewDocDescription] = useState('')
+  const [newDocFile, setNewDocFile] = useState<File | null>(null)
   const [uploadTarget, setUploadTarget] = useState<string | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [changeNote, setChangeNote] = useState('')
@@ -47,6 +48,9 @@ export default function DocumentationProjectDetailPage() {
   const [openTrash, setOpenTrash] = useState<Record<string, boolean>>({})
   const [trashByMilestone, setTrashByMilestone] = useState<Record<string, DocMilestoneVersion[]>>({})
   const [profilesById, setProfilesById] = useState<Record<string, { full_name: string | null; email: string }>>({})
+  const [preview, setPreview] = useState<DocMilestoneVersion | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const myMembership = members.find((member) => member.user_id === user?.id)
   const canEdit = isAdmin || myMembership?.role === 'editor'
@@ -69,18 +73,29 @@ export default function DocumentationProjectDetailPage() {
       const versionsMap = Object.fromEntries(versionEntries)
       setVersionsByMilestone(versionsMap)
 
-      // Nombres para el reporte de actividad reciente (autor de cada avance
-      // y de cada versión subida).
+      // Nombres para el reporte de actividad reciente (autor de cada
+      // documento y de cada versión subida). Se usan primero los miembros
+      // ya cargados (siempre confiables) y solo se hace una consulta aparte
+      // para quien ya no sea miembro del proyecto (ej. alguien removido).
       const authorIds = new Set<string>()
       milestoneData.forEach((milestone) => authorIds.add(milestone.created_by))
       Object.values(versionsMap).forEach((versions) => versions.forEach((version) => authorIds.add(version.created_by)))
-      if (authorIds.size > 0) {
-        const { data: authorProfiles } = await supabase
+
+      const known: Record<string, { full_name: string | null; email: string }> = {}
+      memberData.forEach((member) => {
+        known[member.user_id] = { full_name: member.full_name, email: member.email }
+      })
+      const missingIds = Array.from(authorIds).filter((id) => !known[id])
+      if (missingIds.length > 0) {
+        const { data: extraProfiles } = await supabase
           .from('profiles')
           .select('id, full_name, email')
-          .in('id', Array.from(authorIds))
-        setProfilesById(Object.fromEntries((authorProfiles ?? []).map((profile) => [profile.id, profile])))
+          .in('id', missingIds)
+        for (const profile of extraProfiles ?? []) {
+          known[profile.id] = { full_name: profile.full_name, email: profile.email }
+        }
       }
+      setProfilesById(known)
     } catch {
       setError('No se pudo cargar el proyecto.')
     } finally {
@@ -98,19 +113,34 @@ export default function DocumentationProjectDetailPage() {
     setVersionsByMilestone((current) => ({ ...current, [milestoneId]: versions }))
   }
 
-  const submitMilestone = async () => {
-    if (!milestoneTitle.trim()) return
+  // Un solo paso: título + PDF juntos, en vez de crear primero un "avance"
+  // vacío y recién después subir el archivo por separado.
+  const submitNewDocument = async () => {
+    if (!newDocTitle.trim() || !newDocFile) {
+      setError('Ingresa un título y selecciona un archivo PDF.')
+      return
+    }
+    if (newDocFile.type !== 'application/pdf') {
+      setError('Selecciona un archivo PDF válido.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
-      const created = await createMilestone(projectId, milestoneTitle, milestoneDescription)
-      setMilestones((current) => [...current, created])
-      setVersionsByMilestone((current) => ({ ...current, [created.id]: [] }))
-      setShowNewMilestone(false)
-      setMilestoneTitle('')
-      setMilestoneDescription('')
-    } catch {
-      setError('No se pudo crear el avance.')
+      const milestone = await createMilestone(projectId, newDocTitle, newDocDescription)
+      const version = await uploadVersion(milestone.id, projectId, newDocFile, '')
+      setMilestones((current) => [...current, milestone])
+      setVersionsByMilestone((current) => ({ ...current, [milestone.id]: [version] }))
+      setExpandedMilestone(milestone.id)
+      setShowNewDoc(false)
+      setNewDocTitle('')
+      setNewDocDescription('')
+      setNewDocFile(null)
+      // La IA analiza el PDF en segundo plano; se refresca pasado un tiempo
+      // razonable para mostrar el resumen.
+      setTimeout(() => { void refreshVersions(milestone.id) }, 6000)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo subir el documento.')
     } finally {
       setBusy(false)
     }
@@ -131,8 +161,8 @@ export default function DocumentationProjectDetailPage() {
       setUploadTarget(null)
       setUploadFile(null)
       setChangeNote('')
-      // La IA analiza el PDF en segundo plano (Edge Function); se refresca
-      // una vez pasado un tiempo razonable para mostrar el resumen.
+      // La IA analiza el PDF en segundo plano; se refresca pasado un tiempo
+      // razonable para mostrar el resumen y la comparación con la anterior.
       setTimeout(() => { void refreshVersions(target) }, 6000)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudo subir el documento.')
@@ -151,12 +181,12 @@ export default function DocumentationProjectDetailPage() {
   }
 
   const removeMilestone = async (milestone: DocMilestone) => {
-    if (!window.confirm(`¿Eliminar el avance "${milestone.title}" y todas sus versiones? Esta acción no se puede deshacer.`)) return
+    if (!window.confirm(`¿Eliminar "${milestone.title}" y todas sus versiones? Esta acción no se puede deshacer.`)) return
     try {
       await deleteMilestone(milestone.id)
       setMilestones((current) => current.filter((item) => item.id !== milestone.id))
     } catch {
-      setError('No se pudo eliminar el avance.')
+      setError('No se pudo eliminar el documento.')
     }
   }
 
@@ -211,13 +241,25 @@ export default function DocumentationProjectDetailPage() {
     }
   }
 
+  // Vista previa embebida (igual que el listado global de Documentos), en
+  // vez de solo abrir el PDF en una pestaña nueva.
   const openFile = async (version: DocMilestoneVersion) => {
+    setPreview(version)
+    setPreviewUrl('')
+    setPreviewLoading(true)
+    setError('')
     try {
-      const url = await getVersionUrl(version)
-      window.open(url, '_blank', 'noreferrer')
+      setPreviewUrl(await getVersionUrl(version))
     } catch {
-      setError('No se pudo abrir el documento.')
+      setPreview(null)
+      setError('No se pudo generar la vista previa del PDF.')
+    } finally {
+      setPreviewLoading(false)
     }
+  }
+  const closePreview = () => {
+    setPreview(null)
+    setPreviewUrl('')
   }
 
   const addExistingUser = async (userId: string, role: DocProjectRole) => {
@@ -237,7 +279,7 @@ export default function DocumentationProjectDetailPage() {
   if (!project) return <p className="p-10 text-center text-sm text-[var(--text-muted)]">Proyecto no encontrado.</p>
 
   // Reporte del proyecto: resumen agregado + actividad reciente combinando
-  // las versiones de TODOS los avances (no solo el que esté expandido).
+  // las versiones de TODOS los documentos (no solo el que esté expandido).
   const doneCount = milestones.filter((milestone) => milestone.status === 'hecho').length
   const totalVersions = Object.values(versionsByMilestone).reduce((sum, versions) => sum + versions.length, 0)
   const milestonesById = Object.fromEntries(milestones.map((milestone) => [milestone.id, milestone]))
@@ -260,10 +302,10 @@ export default function DocumentationProjectDetailPage() {
         {canEdit && (
           <button
             type="button"
-            onClick={() => setShowNewMilestone(true)}
+            onClick={() => setShowNewDoc(true)}
             className="flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"
           >
-            <Plus size={17} /> Nuevo avance
+            <Upload size={17} /> Subir documento
           </button>
         )}
       </section>
@@ -275,7 +317,7 @@ export default function DocumentationProjectDetailPage() {
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
             <p className="text-2xl font-semibold text-[var(--text-primary)]">{doneCount}/{milestones.length}</p>
-            <p className="text-xs text-[var(--text-muted)]">Avances completados</p>
+            <p className="text-xs text-[var(--text-muted)]">Documentos completados</p>
           </div>
           <div>
             <p className="text-2xl font-semibold text-[var(--text-primary)]">{totalVersions}</p>
@@ -298,7 +340,7 @@ export default function DocumentationProjectDetailPage() {
                   <li key={item.id} className="flex items-center justify-between gap-3 text-sm">
                     <span className="min-w-0 truncate text-[var(--text-secondary)]">
                       <strong className="text-[var(--text-primary)]">{author?.full_name ?? author?.email ?? 'Alguien'}</strong>{' '}
-                      subió v{item.version_number} de &quot;{milestonesById[item.milestoneId]?.title ?? 'un avance'}&quot;
+                      subió v{item.version_number} de &quot;{milestonesById[item.milestoneId]?.title ?? 'un documento'}&quot;
                     </span>
                     <span className="shrink-0 text-xs text-[var(--text-muted)]">{new Date(item.created_at).toLocaleDateString('es-PE')}</span>
                   </li>
@@ -351,10 +393,11 @@ export default function DocumentationProjectDetailPage() {
       </section>
 
       <section className="space-y-4">
+        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Documentos del proyecto</p>
         {milestones.length === 0 ? (
           <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] p-12 text-center">
             <FileText className="mx-auto text-[var(--text-muted)]" size={38} />
-            <p className="mt-3 text-sm text-[var(--text-secondary)]">Todavía no hay avances en este proyecto.</p>
+            <p className="mt-3 text-sm text-[var(--text-secondary)]">Todavía no hay documentos en este proyecto.</p>
           </div>
         ) : (
           milestones.map((milestone) => {
@@ -396,7 +439,7 @@ export default function DocumentationProjectDetailPage() {
                     {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   {canEdit && (
-                    <button type="button" onClick={() => void removeMilestone(milestone)} className="rounded-lg border border-rose-500/20 p-2 text-rose-500" aria-label="Eliminar avance">
+                    <button type="button" onClick={() => void removeMilestone(milestone)} className="rounded-lg border border-rose-500/20 p-2 text-rose-500" aria-label="Eliminar documento">
                       <Trash2 size={16} />
                     </button>
                   )}
@@ -458,11 +501,13 @@ export default function DocumentationProjectDetailPage() {
                                     ))}
                                   </div>
                                 )}
-                                {version.ai_diff_summary && (
+                                {version.ai_diff_summary ? (
                                   <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--surface)] p-2.5">
-                                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]"><GitCompare size={12} /> Qué cambió respecto a la anterior</p>
+                                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]"><GitCompare size={12} /> Comparación con la versión anterior</p>
                                     <p className="mt-1 text-sm text-[var(--text-secondary)]">{version.ai_diff_summary}</p>
                                   </div>
+                                ) : version.version_number === 1 ? null : (
+                                  <p className="text-xs italic text-[var(--text-muted)]">Comparando con la versión anterior...</p>
                                 )}
                               </div>
                             ) : (
@@ -513,36 +558,42 @@ export default function DocumentationProjectDetailPage() {
         )}
       </section>
 
-      {showNewMilestone && (
+      {showNewDoc && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Nuevo avance</h3>
-              <button type="button" onClick={() => setShowNewMilestone(false)} aria-label="Cerrar"><X size={20} /></button>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">Subir documento</h3>
+              <button type="button" onClick={() => { setShowNewDoc(false); setNewDocFile(null) }} aria-label="Cerrar"><X size={20} /></button>
             </div>
             <div className="mt-5 space-y-4">
               <label className="block text-sm text-[var(--text-secondary)]">
                 Título
                 <input
-                  value={milestoneTitle}
-                  onChange={(event) => setMilestoneTitle(event.target.value)}
+                  value={newDocTitle}
+                  onChange={(event) => setNewDocTitle(event.target.value)}
+                  placeholder="Ej. Contrato de arrendamiento"
                   className="mt-1.5 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)]"
                 />
               </label>
+              <label className="block rounded-xl border border-dashed border-[var(--border)] p-6 text-center">
+                <Upload className="mx-auto text-[var(--accent)]" />
+                <span className="mt-2 block text-sm text-[var(--text-secondary)]">{newDocFile?.name ?? 'Seleccionar PDF (máximo 20 MB)'}</span>
+                <input className="sr-only" type="file" accept="application/pdf,.pdf" onChange={(event) => setNewDocFile(event.target.files?.[0] ?? null)} />
+              </label>
               <label className="block text-sm text-[var(--text-secondary)]">
-                Descripción
+                Descripción (opcional)
                 <textarea
-                  value={milestoneDescription}
-                  onChange={(event) => setMilestoneDescription(event.target.value)}
-                  rows={3}
+                  value={newDocDescription}
+                  onChange={(event) => setNewDocDescription(event.target.value)}
+                  rows={2}
                   className="mt-1.5 w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)]"
                 />
               </label>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowNewMilestone(false)} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)]">Cancelar</button>
-              <button disabled={busy} onClick={() => void submitMilestone()} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                {busy ? 'Creando...' : 'Crear avance'}
+              <button type="button" onClick={() => { setShowNewDoc(false); setNewDocFile(null) }} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-secondary)]">Cancelar</button>
+              <button disabled={busy || !newDocFile} onClick={() => void submitNewDocument()} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {busy ? 'Subiendo...' : 'Subir'}
               </button>
             </div>
           </div>
@@ -580,6 +631,30 @@ export default function DocumentationProjectDetailPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {preview && (
+        <div className="fixed inset-0 z-[80] flex flex-col bg-black/75 p-2 backdrop-blur-sm sm:p-5">
+          <section className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
+            <header className="flex items-center gap-3 border-b border-[var(--border-soft)] px-4 py-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500"><FileText size={19} /></div>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">v{preview.version_number}{preview.change_note ? ` — ${preview.change_note}` : ''}</h3>
+                <p className="text-xs text-[var(--text-muted)]">Vista previa del documento</p>
+              </div>
+              {previewUrl && (
+                <a href={previewUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">
+                  <ExternalLink size={16} /><span className="hidden sm:inline">Abrir aparte</span>
+                </a>
+              )}
+              <button type="button" onClick={closePreview} aria-label="Cerrar vista previa" className="rounded-lg border border-[var(--border)] p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><X size={18} /></button>
+            </header>
+            <div className="relative min-h-0 flex-1 bg-[#525659]">
+              {previewLoading && <div className="absolute inset-0 flex items-center justify-center"><p className="rounded-lg bg-black/40 px-4 py-2 text-sm text-white">Cargando PDF...</p></div>}
+              {previewUrl && <iframe src={`${previewUrl}#view=FitH`} title={`Vista previa v${preview.version_number}`} className="h-full w-full border-0" />}
+            </div>
+          </section>
         </div>
       )}
 

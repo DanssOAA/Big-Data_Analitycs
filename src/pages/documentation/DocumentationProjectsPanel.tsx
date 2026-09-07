@@ -56,7 +56,7 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
   return (
     <div className="space-y-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <p className="text-sm text-[var(--text-secondary)]">Agrupa avances y documentos por proyecto, con historial de versiones.</p>
+        <p className="text-sm text-[var(--text-secondary)]">Agrupa documentos por proyecto, con historial de versiones y comparación con IA.</p>
         {can('doc_projects', 'create') && (
           <button
             type="button"
@@ -100,7 +100,7 @@ export default function DocumentationProjectsPanel({ openCreateSignal }: Documen
                   <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${progress}%` }} />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
-                  <span>{project.doneCount ?? 0}/{project.milestoneCount ?? 0} avances</span>
+                  <span>{project.doneCount ?? 0}/{project.milestoneCount ?? 0} documentos</span>
                   <span className="flex items-center gap-1"><Users size={12} />{project.memberCount ?? 0}</span>
                 </div>
               </Link>

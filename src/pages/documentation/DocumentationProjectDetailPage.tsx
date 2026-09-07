@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Circle, ClipboardList, Clock, ExternalLink, FileText,
-  GitCompare, History, Sparkles, Trash2, Upload, UserMinus, UserPlus, X,
+  GitCompare, History, Sparkles, Trash2, Upload, Users, X,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../services/supabaseClient'
 import DoubleConfirmDeleteModal from '../../components/documentation/DoubleConfirmDeleteModal'
 import InviteExistingUserModal from '../../components/documentation/InviteExistingUserModal'
+import ProjectMembersModal from '../../components/documentation/ProjectMembersModal'
 import {
   addMember, createMilestone, deleteMilestone, getProject, getVersionUrl, listMembers, listMilestones,
   listVersions, purgeVersion, removeMember, restoreVersion, softDeleteVersion, updateMemberRole,
@@ -36,6 +37,7 @@ export default function DocumentationProjectDetailPage() {
   const [error, setError] = useState('')
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null)
   const [showInvite, setShowInvite] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
   const [showNewDoc, setShowNewDoc] = useState(false)
   const [newDocTitle, setNewDocTitle] = useState('')
   const [newDocDescription, setNewDocDescription] = useState('')
@@ -264,12 +266,14 @@ export default function DocumentationProjectDetailPage() {
 
   const addExistingUser = async (userId: string, role: DocProjectRole) => {
     setBusy(true)
+    setError('')
     try {
       await addMember(projectId, userId, role)
-      await load()
+      setMembers(await listMembers(projectId))
       setShowInvite(false)
     } catch {
       setError('No se pudo agregar a la persona.')
+      setShowInvite(false)
     } finally {
       setBusy(false)
     }
@@ -299,15 +303,22 @@ export default function DocumentationProjectDetailPage() {
           <h2 className="text-2xl font-semibold text-[var(--text-primary)]">{project.name}</h2>
           {project.description && <p className="mt-2 text-sm text-[var(--text-secondary)]">{project.description}</p>}
         </div>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={() => setShowNewDoc(true)}
-            className="flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            <Upload size={17} /> Subir documento
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          <button type="button" onClick={() => { setError(''); setShowMembers(true) }} aria-haspopup="dialog"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-[var(--accent)]">
+            <Users size={17} /> Miembros
+            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-xs tabular-nums text-[var(--accent)]">{members.length}</span>
           </button>
-        )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setShowNewDoc(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--accent-hover)]"
+            >
+              <Upload size={17} /> Subir documento
+            </button>
+          )}
+        </div>
       </section>
 
       {error && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">{error}</div>}
@@ -348,47 +359,6 @@ export default function DocumentationProjectDetailPage() {
               })}
             </ul>
           )}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] p-5">
-        <div className="flex items-center justify-between">
-          <p className="font-semibold text-[var(--text-primary)]">Miembros</p>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setShowInvite(true)}
-              className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-secondary)]"
-            >
-              <UserPlus size={14} /> Agregar
-            </button>
-          )}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {members.length === 0 && <p className="text-sm text-[var(--text-muted)]">Sin miembros todavía.</p>}
-          {members.map((member) => (
-            <span key={member.user_id} className="flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs text-[var(--text-secondary)]">
-              {member.full_name ?? member.email}
-              {isAdmin ? (
-                <>
-                  <select
-                    aria-label={`Rol de ${member.email}`}
-                    value={member.role}
-                    onChange={(event) => void updateMemberRole(projectId, member.user_id, event.target.value as DocProjectRole).then(load)}
-                    className="rounded border-0 bg-transparent text-xs text-[var(--text-secondary)]"
-                  >
-                    <option value="viewer">Lectura</option>
-                    <option value="editor">Editor</option>
-                  </select>
-                  <button type="button" onClick={() => void removeMember(projectId, member.user_id).then(load)} aria-label={`Quitar a ${member.email}`}>
-                    <UserMinus size={13} className="text-rose-500" />
-                  </button>
-                </>
-              ) : (
-                <span>· {member.role === 'editor' ? 'Editor' : 'Lectura'}</span>
-              )}
-            </span>
-          ))}
         </div>
       </section>
 
@@ -656,6 +626,25 @@ export default function DocumentationProjectDetailPage() {
             </div>
           </section>
         </div>
+      )}
+
+      {showMembers && !showInvite && (
+        <ProjectMembersModal
+          projectName={project.name}
+          members={members}
+          isAdmin={isAdmin}
+          error={error}
+          onClose={() => setShowMembers(false)}
+          onInvite={() => { setError(''); setShowInvite(true) }}
+          onChangeRole={async (member, role) => {
+            await updateMemberRole(projectId, member.user_id, role)
+            setMembers(current => current.map(item => item.user_id === member.user_id ? { ...item, role } : item))
+          }}
+          onRemove={async member => {
+            await removeMember(projectId, member.user_id)
+            setMembers(current => current.filter(item => item.user_id !== member.user_id))
+          }}
+        />
       )}
 
       {showInvite && (

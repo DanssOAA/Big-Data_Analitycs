@@ -89,7 +89,7 @@ export default function ProjectsPage() {
           <p className="text-sm font-medium text-[var(--accent)]">Colaboración</p>
           <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Proyectos</h2>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Cada proyecto agrupa datasets y tiene su propio equipo de colaboradores.
+            Cada proyecto agrupa datasets y tiene su propio equipo de colaboradores, como un repositorio en GitHub.
           </p>
         </div>
         <button

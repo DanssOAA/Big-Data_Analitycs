@@ -79,11 +79,15 @@ export async function listProjects(): Promise<DocumentationProject[]> {
   if (list.length === 0) return list
 
   const ids = list.map((project) => project.id)
-  const [{ data: session }, { data: members }, { data: milestones }] = await Promise.all([
+  const [{ data: session }, membersResult, milestonesResult] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from('documentation_project_members').select('project_id, user_id, role').in('project_id', ids),
     supabase.from('documentation_milestones').select('project_id, status').in('project_id', ids),
   ])
+  if (membersResult.error) throw toError(membersResult.error)
+  if (milestonesResult.error) throw toError(milestonesResult.error)
+  const members = membersResult.data
+  const milestones = milestonesResult.data
 
   return list.map((project) => {
     const projectMembers = (members ?? []).filter((member) => member.project_id === project.id)

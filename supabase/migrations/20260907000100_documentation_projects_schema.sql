@@ -187,12 +187,12 @@ drop policy if exists "docproj_select_members" on public.documentation_project_m
 drop policy if exists "docproj_insert_members" on public.documentation_project_members;
 drop policy if exists "docproj_update_members" on public.documentation_project_members;
 drop policy if exists "docproj_delete_members" on public.documentation_project_members;
+-- OJO: usa has_doc_project_role() (security definer) en vez de comparar
+-- esta tabla contra sí misma con un subquery directo -- eso causa
+-- "infinite recursion detected in policy" porque Postgres reaplica esta
+-- misma policy al evaluar el subquery interno, ya que la tabla tiene RLS.
 create policy "docproj_select_members" on public.documentation_project_members for select to authenticated
-  using (public.is_admin() or exists (
-    select 1 from public.documentation_project_members self
-    where self.project_id = documentation_project_members.project_id
-      and self.user_id = (select auth.uid())
-  ));
+  using (public.has_doc_project_role(project_id, 'viewer'));
 create policy "docproj_insert_members" on public.documentation_project_members for insert to authenticated
   with check (public.is_admin());
 create policy "docproj_update_members" on public.documentation_project_members for update to authenticated

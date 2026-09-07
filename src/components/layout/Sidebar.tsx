@@ -5,7 +5,6 @@ import {
   BarChart3,
   Database,
   FileText,
-  FolderOpen,
   History,
   LayoutDashboard,
   Package,
@@ -93,12 +92,6 @@ const workerItems: MenuItem[] = [
     module: 'insights',
   },
 ]
-
-const projectsItem: MenuItem = {
-  label: 'Proyectos',
-  path: '/app/proyectos',
-  icon: FolderOpen,
-}
 
 const documentationItem: MenuItem = {
   label: 'Documentación', path: '/app/documentacion', icon: FileText, module: 'documentation',
@@ -241,13 +234,6 @@ export default function Sidebar({
             ))}
           </div>
 
-          {/* Proyectos: visible para todos */}
-          <p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            Colaboración
-          </p>
-          <div className="space-y-1">
-            <MenuLink item={projectsItem} onClick={onClose} />
-          </div>
         </nav>
       </aside>
     </>

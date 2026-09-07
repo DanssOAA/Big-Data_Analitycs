@@ -14,6 +14,7 @@ const size = (bytes: number) => bytes < 1024 * 1024
 export default function DocumentationPage() {
   const { can } = useAuth()
   const [tab, setTab] = useState<'documentos' | 'proyectos'>('documentos')
+  const [openProjectCreateSignal, setOpenProjectCreateSignal] = useState(0)
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -88,7 +89,10 @@ export default function DocumentationPage() {
         <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Documentación</h2>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">{tab === 'documentos' ? 'Consulta y administra los documentos PDF del sistema.' : 'Organiza avances por proyecto, con historial de versiones y vista previa con IA.'}</p>
       </div>
-      {tab === 'documentos' && can('documentation', 'create') && <button type="button" onClick={() => setModal('upload')} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}
+      <div className="flex flex-wrap gap-2">
+        {can('documentation', 'create') && <button type="button" onClick={() => { setTab('documentos'); setModal('upload') }} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}
+        {can('doc_projects', 'create') && <button type="button" onClick={() => { setTab('proyectos'); setOpenProjectCreateSignal((value) => value + 1) }} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent)]"><FolderKanban size={17}/> Crear proyecto</button>}
+      </div>
     </section>
 
     {can('doc_projects') && <div className="flex gap-2 border-b border-[var(--border-soft)]">
@@ -96,7 +100,7 @@ export default function DocumentationPage() {
       <button type="button" onClick={() => setTab('proyectos')} className={`flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium ${tab === 'proyectos' ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-transparent text-[var(--text-secondary)]'}`}><FolderKanban size={16}/> Proyectos</button>
     </div>}
 
-    {tab === 'proyectos' ? <DocumentationProjectsPanel /> : <>
+    {tab === 'proyectos' ? <DocumentationProjectsPanel openCreateSignal={openProjectCreateSignal} /> : <>
     {error && !modal && <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-500">{error}</div>}
     <section className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
       {loading ? <p className="p-10 text-center text-sm text-[var(--text-muted)]">Cargando documentos...</p>

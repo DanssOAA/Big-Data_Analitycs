@@ -4,7 +4,14 @@ import { Link } from 'react-router'
 import { useAuth } from '../../context/AuthContext'
 import { createProject, listProjects, type DocumentationProject } from '../../services/documentationProjects.service'
 
-export default function DocumentationProjectsPanel() {
+interface DocumentationProjectsPanelProps {
+  // Se incrementa desde el botón "Crear proyecto" del encabezado de
+  // Documentación para abrir el modal de creación sin importar en qué
+  // pestaña esté el usuario.
+  openCreateSignal?: number
+}
+
+export default function DocumentationProjectsPanel({ openCreateSignal }: DocumentationProjectsPanelProps) {
   const { can } = useAuth()
   const [projects, setProjects] = useState<DocumentationProject[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +27,11 @@ export default function DocumentationProjectsPanel() {
       .catch(() => setError('No se pudieron cargar los proyectos.'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (openCreateSignal) setShowCreate(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openCreateSignal])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()

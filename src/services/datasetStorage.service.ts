@@ -96,7 +96,7 @@ function toDatasetRecord(
 
 export async function uploadDataset(
   file: File,
-  sourceType: DatasetSourceType = 'external',
+  sourceType?: DatasetSourceType,
 ): Promise<DatasetRecord>
 export async function uploadDataset(
   file: File,

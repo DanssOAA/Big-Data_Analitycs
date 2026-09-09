@@ -302,6 +302,7 @@ function collectProducts(
 }
 
 export async function importProductsFromFile(
+  projectId: string,
   file: File,
   onProgress?: (
     progress: ProductImportProgress,
@@ -320,7 +321,7 @@ export async function importProductsFromFile(
     )
   }
 
-  const existingProducts = await getProducts()
+  const existingProducts = await getProducts(projectId)
   const collected = collectProducts(
     matchingTables,
     existingProducts,
@@ -347,7 +348,7 @@ export async function importProductsFromFile(
       .from('products')
       .upsert(
         batch.map((product) => ({
-          id: product.id,
+          id: product.id, project_id: projectId,
           code: product.code,
           name: product.name,
           category: product.category,

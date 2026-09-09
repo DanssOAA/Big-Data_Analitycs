@@ -10,6 +10,7 @@ import type {
 } from '../types/crm.types'
 
 interface ClientRow {
+  project_id: string
   id: string
   code: string
   name: string
@@ -21,6 +22,7 @@ interface ClientRow {
 }
 
 interface SaleRow {
+  project_id: string
   id: string
   code: string
   client_id: string | null
@@ -46,9 +48,9 @@ function fromClientRow(row: ClientRow): CrmClient {
   }
 }
 
-function toClientRow(client: CrmClient): ClientRow {
+function toClientRow(projectId: string, client: CrmClient): ClientRow {
   return {
-    id: client.id,
+    id: client.id, project_id: projectId,
     code: client.code,
     name: client.name,
     company: client.company,
@@ -74,9 +76,9 @@ function fromSaleRow(row: SaleRow): CrmSale {
   }
 }
 
-function toSaleRow(sale: CrmSale): SaleRow {
+function toSaleRow(projectId: string, sale: CrmSale): SaleRow {
   return {
-    id: sale.id,
+    id: sale.id, project_id: projectId,
     code: sale.code,
     client_id: sale.clientId || null,
     product: sale.product,
@@ -89,12 +91,13 @@ function toSaleRow(sale: CrmSale): SaleRow {
   }
 }
 
-export async function getClients(): Promise<CrmClient[]> {
+export async function getClients(projectId: string): Promise<CrmClient[]> {
   const rows = await fetchAllPages<ClientRow>(
     (from, to) =>
       supabase
         .from('clients')
         .select('*')
+        .eq('project_id', projectId)
         .order('created_at', {
           ascending: false,
         })
@@ -105,11 +108,12 @@ export async function getClients(): Promise<CrmClient[]> {
 }
 
 export async function saveClient(
+  projectId: string,
   client: CrmClient,
 ): Promise<void> {
   const { error } = await supabase
     .from('clients')
-    .upsert(toClientRow(client))
+    .upsert(toClientRow(projectId, client))
 
   if (error) {
     throw toError(error)
@@ -117,11 +121,13 @@ export async function saveClient(
 }
 
 export async function deleteClient(
+  projectId: string,
   clientId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('clients')
     .delete()
+    .eq('project_id', projectId)
     .eq('id', clientId)
 
   if (error) {
@@ -129,12 +135,13 @@ export async function deleteClient(
   }
 }
 
-export async function getSales(): Promise<CrmSale[]> {
+export async function getSales(projectId: string): Promise<CrmSale[]> {
   const rows = await fetchAllPages<SaleRow>(
     (from, to) =>
       supabase
         .from('sales')
         .select('*')
+        .eq('project_id', projectId)
         .order('date', {
           ascending: false,
         })
@@ -148,11 +155,12 @@ export async function getSales(): Promise<CrmSale[]> {
 }
 
 export async function saveSale(
+  projectId: string,
   sale: CrmSale,
 ): Promise<void> {
   const { error } = await supabase
     .from('sales')
-    .upsert(toSaleRow(sale))
+    .upsert(toSaleRow(projectId, sale))
 
   if (error) {
     throw toError(error)
@@ -160,11 +168,13 @@ export async function saveSale(
 }
 
 export async function deleteSale(
+  projectId: string,
   saleId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('sales')
     .delete()
+    .eq('project_id', projectId)
     .eq('id', saleId)
 
   if (error) {

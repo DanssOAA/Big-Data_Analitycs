@@ -5,6 +5,7 @@ import { supabase } from './supabaseClient'
 import type { Product } from '../types/crm.types'
 
 interface ProductRow {
+  project_id: string
   id: string
   code: string
   name: string
@@ -30,7 +31,7 @@ function fromRow(row: ProductRow): Product {
   }
 }
 
-export async function getProducts(): Promise<
+export async function getProducts(projectId: string): Promise<
   Product[]
 > {
   const pageSize = 1000
@@ -45,6 +46,7 @@ export async function getProducts(): Promise<
       await supabase
         .from('products')
         .select('*')
+        .eq('project_id', projectId)
         .order('created_at', {
           ascending: false,
         })
@@ -69,12 +71,13 @@ export async function getProducts(): Promise<
 }
 
 export async function saveProduct(
+  projectId: string,
   product: Product,
 ): Promise<void> {
   const { error } = await supabase
     .from('products')
     .upsert({
-      id: product.id,
+      id: product.id, project_id: projectId,
       code: product.code,
       name: product.name,
       category: product.category,
@@ -92,11 +95,13 @@ export async function saveProduct(
 }
 
 export async function deleteProduct(
+  projectId: string,
   productId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('products')
     .delete()
+    .eq('project_id', projectId)
     .eq('id', productId)
 
   if (error) {

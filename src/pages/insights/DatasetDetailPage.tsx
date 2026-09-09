@@ -123,8 +123,8 @@ export default function DatasetDetailPage() {
 
         const [result, allDatasets] =
           await Promise.all([
-            getDataset(datasetId),
-            getDatasets(activeProject?.id ?? null),
+            getDataset(activeProject!.id, datasetId),
+            getDatasets(activeProject!.id),
           ])
 
         if (result) {
@@ -179,7 +179,7 @@ export default function DatasetDetailPage() {
         </p>
 
         <Link
-          to="/admin/insights"
+          to="/app/datasets"
           className="mt-4 inline-block text-sm font-medium text-[var(--accent)]"
         >
           Volver
@@ -297,7 +297,7 @@ export default function DatasetDetailPage() {
 
       try {
         const crmSnapshot =
-          await getCrmMetricsSnapshot()
+          await getCrmMetricsSnapshot(activeProject!.id)
 
         if (
           compareTarget ===
@@ -344,6 +344,7 @@ export default function DatasetDetailPage() {
 
           const saved =
             await saveInsight({
+              projectId: activeProject!.id,
               analysis,
               comparisonMode:
                 'crm',
@@ -359,14 +360,14 @@ export default function DatasetDetailPage() {
             })
 
           navigate(
-            `/admin/insights/analisis/${saved.id}`,
+            `/app/insights/${saved.id}`,
           )
 
           return
         }
 
         const comparedDataset =
-          await getDataset(
+          await getDataset(activeProject!.id,
             compareTarget,
           )
 
@@ -436,6 +437,7 @@ export default function DatasetDetailPage() {
 
         const saved =
           await saveInsight({
+            projectId: activeProject!.id,
             analysis,
             comparisonMode:
               'datasets',
@@ -452,7 +454,7 @@ export default function DatasetDetailPage() {
           })
 
         navigate(
-          `/admin/insights/analisis/${saved.id}`,
+          `/app/insights/${saved.id}`,
         )
       } catch (exception) {
         setCompareError(
@@ -480,7 +482,7 @@ export default function DatasetDetailPage() {
     <div className="space-y-6">
       <section>
         <Link
-          to="/admin/insights"
+          to="/app/datasets"
           className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           <ArrowLeft size={16} />

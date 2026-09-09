@@ -20,6 +20,7 @@ import RecentActivity from '../../components/dashboard/RecentActivity'
 import SalesChart from '../../components/dashboard/SalesChart'
 
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 
 import { computeCrmMetrics } from '../../services/crmMetrics.service'
 
@@ -51,6 +52,7 @@ function parseLocalDate(
 }
 
 export default function DashboardPage() {
+  const { activeProject } = useProject()
   const {
     user,
     isAdmin,
@@ -72,8 +74,8 @@ export default function DashboardPage() {
         storedSales,
         storedClients,
       ] = await Promise.all([
-        getSales(),
-        getClients(),
+        getSales(activeProject!.id),
+        getClients(activeProject!.id),
       ])
 
       setSales(storedSales)
@@ -81,7 +83,7 @@ export default function DashboardPage() {
     }
 
     void load()
-  }, [])
+  }, [activeProject?.id])
 
   const metrics = useMemo(() => {
     const crmMetrics =
@@ -346,7 +348,7 @@ export default function DashboardPage() {
           <Link
             to={
               isAdmin
-                ? '/admin/insights'
+                ? '/app/datasets'
                 : '/app/insights'
             }
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)]"

@@ -32,6 +32,7 @@ import {
 } from 'react-router'
 
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 
 import {
   getInsight,
@@ -68,7 +69,8 @@ export default function InsightDetailPage() {
   const { analysisId } =
     useParams()
 
-  const { isAdmin } = useAuth()
+  const { isAdmin, can } = useAuth()
+  const { activeProject } = useProject()
 
   const [
     insight,
@@ -95,7 +97,7 @@ export default function InsightDetailPage() {
       }
 
       const result =
-        await getInsight(
+        await getInsight(activeProject!.id,
           analysisId,
         )
 
@@ -106,7 +108,7 @@ export default function InsightDetailPage() {
     }
 
     void load()
-  }, [analysisId])
+  }, [analysisId, activeProject?.id])
 
   const chartData = useMemo(() => {
     if (
@@ -178,7 +180,7 @@ export default function InsightDetailPage() {
         const next =
           !insight.published
 
-        await publishInsight(
+        await publishInsight(activeProject!.id,
           insight.id,
           next,
         )
@@ -195,9 +197,7 @@ export default function InsightDetailPage() {
       }
     }
 
-  const backHref = isAdmin
-    ? '/admin/insights'
-    : '/app/insights'
+  const backHref = '/app/insights'
 
   if (loading) {
     return (
@@ -269,7 +269,7 @@ export default function InsightDetailPage() {
             </h2>
           </div>
 
-          {isAdmin && (
+          {(isAdmin || can('insights', 'update')) && (
             <button
               type="button"
               disabled={

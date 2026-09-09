@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   useState,
   type FormEvent,
 } from 'react'
@@ -9,11 +8,9 @@ import {
   BarChart3,
   Lock,
   Mail,
-  ShieldCheck,
-  X,
 } from 'lucide-react'
 
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import LoginShowcase from '../../components/auth/LoginShowcase'
 
@@ -22,11 +19,8 @@ import { useAuth } from '../../context/AuthContext'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [adminAccess, setAdminAccess] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  const secretClicks = useRef(0)
 
   const { login, user } = useAuth()
 
@@ -39,31 +33,6 @@ export default function LoginPage() {
       })
     }
   }, [user, navigate])
-
-  const handleSecretAccess = () => {
-    if (adminAccess) {
-      return
-    }
-
-    secretClicks.current += 1
-
-    if (secretClicks.current >= 5) {
-      secretClicks.current = 0
-
-      setAdminAccess(true)
-      setError('')
-      setEmail('')
-      setPassword('')
-    }
-  }
-
-  const disableAdminMode = () => {
-    setAdminAccess(false)
-    setError('')
-    setEmail('')
-    setPassword('')
-    secretClicks.current = 0
-  }
 
   const handleSubmit = async (
     event: FormEvent,
@@ -101,9 +70,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-center bg-gradient-to-br from-[var(--accent)] to-[#4a3aad] px-4 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center">
-            <button
-              type="button"
-              onClick={handleSecretAccess}
+            <div
               className="inline-flex min-h-14 select-none items-center gap-3 rounded-2xl border border-white/80 bg-white px-5 py-3 text-xl font-semibold tracking-tight text-[#4a3aad] shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/95 hover:shadow-2xl"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
@@ -119,25 +86,7 @@ export default function LoginPage() {
                   Portal de acceso
                 </span>
               </span>
-            </button>
-
-            {adminAccess && (
-              <div className="mt-4 flex justify-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
-                  <ShieldCheck size={14} />
-
-                  Modo Administrador
-
-                  <button
-                    type="button"
-                    onClick={disableAdminMode}
-                    className="ml-1 rounded-full p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           <div className="rounded-3xl bg-white/10 p-7 shadow-2xl shadow-black/20 backdrop-blur-xl">
@@ -146,9 +95,7 @@ export default function LoginPage() {
             </h2>
 
             <p className="mt-1.5 text-sm text-white/70">
-              {adminAccess
-                ? 'Acceso administrativo habilitado.'
-                : 'Ingresa tus credenciales corporativas para continuar.'}
+              Ingresa tus credenciales corporativas para continuar.
             </p>
 
             <form
@@ -206,6 +153,7 @@ export default function LoginPage() {
                   ? 'Ingresando...'
                   : 'Ingresar'}
               </button>
+              <p className="text-center text-sm text-white/80">¿No tienes acceso? <Link className="font-semibold text-white underline" to="/solicitar-acceso">Solicítalo</Link></p>
             </form>
           </div>
         </div>

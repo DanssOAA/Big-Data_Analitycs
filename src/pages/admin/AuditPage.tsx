@@ -1,0 +1,3 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../../services/supabaseClient'
+export default function AuditPage(){const [rows,setRows]=useState<Array<Record<string,unknown>>>([]);useEffect(()=>{void supabase.from('audit_log').select('*').order('created_at',{ascending:false}).limit(200).then(({data})=>setRows(data??[]))},[]);return <div className="space-y-5"><div><p className="text-sm font-medium text-[var(--accent)]">Administración</p><h2 className="text-2xl font-semibold">Auditoría</h2></div><pre className="overflow-auto rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] p-5 text-xs">{JSON.stringify(rows,null,2)}</pre></div>}

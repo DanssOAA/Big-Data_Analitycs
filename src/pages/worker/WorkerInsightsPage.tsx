@@ -12,10 +12,14 @@ import {
 import { Link } from 'react-router'
 
 import { listInsights } from '../../services/aiInsights.service'
+import { useProject } from '../../context/ProjectContext'
+import { useAuth } from '../../context/AuthContext'
 
 import type { InsightRecord } from '../../types/insight.types'
 
 export default function WorkerInsightsPage() {
+  const { activeProject } = useProject()
+  const { user } = useAuth()
   const [
     insights,
     setInsights,
@@ -30,8 +34,8 @@ export default function WorkerInsightsPage() {
     const load = async () => {
       try {
         const result =
-          await listInsights({
-            onlyPublished: true,
+          await listInsights(activeProject!.id, {
+            onlyPublished: user?.role === 'worker',
           })
 
         setInsights(result)
@@ -41,7 +45,7 @@ export default function WorkerInsightsPage() {
     }
 
     void load()
-  }, [])
+  }, [activeProject?.id, user?.role])
 
   return (
     <div className="space-y-6">

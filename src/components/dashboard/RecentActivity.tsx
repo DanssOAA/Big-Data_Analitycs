@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import { getActivities } from '../../services/activitiesStorage.service'
+import { useProject } from '../../context/ProjectContext'
 import {
   getClients,
   getSales,
@@ -79,6 +80,7 @@ interface FeedItem {
 }
 
 export default function RecentActivity() {
+  const { activeProject } = useProject()
   const [
     activities,
     setActivities,
@@ -101,13 +103,13 @@ export default function RecentActivity() {
         storedSales,
         storedClients,
       ] = await Promise.all([
-        getActivities().catch(
+        getActivities(activeProject!.id).catch(
           () => [],
         ),
-        getSales().catch(
+        getSales(activeProject!.id).catch(
           () => [],
         ),
-        getClients().catch(
+        getClients(activeProject!.id).catch(
           () => [],
         ),
       ])
@@ -120,7 +122,7 @@ export default function RecentActivity() {
     }
 
     void load()
-  }, [])
+  }, [activeProject?.id])
 
   const clientMap = useMemo(
     () =>

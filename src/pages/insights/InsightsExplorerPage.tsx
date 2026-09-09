@@ -33,6 +33,7 @@ import type {
 } from '../../types/dataset.types'
 import type { InsightRecord } from '../../types/insight.types'
 import { useProject } from '../../context/ProjectContext'
+import { useAuth } from '../../context/AuthContext'
 
 export default function InsightsExplorerPage() {
   const [datasets, setDatasets] = useState<DatasetRecord[]>([])
@@ -51,13 +52,15 @@ export default function InsightsExplorerPage() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { activeProject } = useProject()
+  const { can } = useAuth()
+  const canCreate = can('datasets', 'create')
 
   const loadDatasets = async () => {
     try {
       const [stored, storedInsights] =
         await Promise.all([
-          getDatasets(activeProject?.id ?? null),
-          listInsights(),
+          getDatasets(activeProject!.id),
+          listInsights(activeProject!.id),
         ])
 
       setDatasets(stored)
@@ -93,7 +96,7 @@ export default function InsightsExplorerPage() {
       try {
         await uploadDataset(
           file,
-          { sourceType: newDatasetSourceType, projectId: activeProject?.id ?? null },
+          { sourceType: newDatasetSourceType, projectId: activeProject!.id },
         )
 
         created.push(file.name)
@@ -167,7 +170,7 @@ export default function InsightsExplorerPage() {
       return
     }
 
-    await deleteDataset(id)
+    await deleteDataset(activeProject!.id, id)
 
     setDatasets((current) =>
       current.filter(
@@ -199,6 +202,7 @@ export default function InsightsExplorerPage() {
 
     try {
       await setDatasetSourceType(
+        activeProject!.id,
         dataset.id,
         sourceType,
       )
@@ -219,6 +223,7 @@ export default function InsightsExplorerPage() {
         multiple
         accept=".csv,.xls,.xlsx"
         className="hidden"
+        disabled={!canCreate}
         onChange={(event) => {
           if (event.target.files) {
             void processFiles(
@@ -243,7 +248,7 @@ export default function InsightsExplorerPage() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {canCreate && <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--text-muted)]">
             Clasificar como
 
@@ -288,7 +293,7 @@ export default function InsightsExplorerPage() {
               ? 'Procesando...'
               : 'Crear dataset'}
           </button>
-        </div>
+        </div>}
       </section>
 
       {message && (
@@ -315,7 +320,7 @@ export default function InsightsExplorerPage() {
         onDragLeave={() =>
           setDragging(false)
         }
-        onDrop={handleDrop}
+        onDrop={canCreate ? handleDrop : undefined}
         className={`rounded-2xl border border-dashed p-7 text-center transition ${
           dragging
             ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
@@ -328,7 +333,7 @@ export default function InsightsExplorerPage() {
         />
 
         <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
-          Arrastra archivos aqui
+          {canCreate ? 'Arrastra archivos aquí' : 'Consulta los datasets disponibles del proyecto'}
         </p>
 
         <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -469,7 +474,7 @@ export default function InsightsExplorerPage() {
                   </div>
 
                   <Link
-                    to={`/admin/insights/analisis/${insight.id}`}
+                    to={`/app/insights/${insight.id}`}
                     className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--accent)]"
                   >
                     Ver

@@ -12,11 +12,13 @@ import {
   useState,
 } from 'react'
 
-import { resetAllProductionData } from '../../services/dangerZone.service'
+import { resetProjectData } from '../../services/dangerZone.service'
+import { useProject } from '../../context/ProjectContext'
 
 const CONFIRM_PHRASE = 'ELIMINAR TODO'
 
 export default function DangerZoneMenu() {
+  const { activeProject } = useProject()
   const [menuOpen, setMenuOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
@@ -75,7 +77,7 @@ export default function DangerZoneMenu() {
     setError('')
 
     try {
-      await resetAllProductionData()
+      await resetProjectData(activeProject!.id)
       window.location.reload()
     } catch (exception) {
       setDeleting(false)
@@ -119,7 +121,7 @@ export default function DangerZoneMenu() {
               className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-rose-500 transition hover:bg-rose-500/10"
             >
               <Trash2 size={16} />
-              Eliminar todos los datos
+              Vaciar proyecto activo
             </button>
           </div>
         )}
@@ -136,7 +138,7 @@ export default function DangerZoneMenu() {
 
                 <div>
                   <h3 className="font-semibold text-[var(--text-primary)]">
-                    Eliminar todos los datos
+                    Vaciar proyecto activo
                   </h3>
 
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -159,7 +161,7 @@ export default function DangerZoneMenu() {
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
                 Se van a borrar de forma permanente <strong>todos</strong> los
                 clientes, ventas, actividades, productos, envios, datasets e
-                insights de esta aplicacion. Las cuentas de acceso (usuarios)
+                insights de <strong>{activeProject?.name}</strong>. Las cuentas de acceso (usuarios)
                 no se ven afectadas.
               </p>
 

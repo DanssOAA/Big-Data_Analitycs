@@ -17,6 +17,7 @@ import {
 import { Link } from 'react-router'
 
 import SaleDetailModal from '../../components/crm/SaleDetailModal'
+import { useProject } from '../../context/ProjectContext'
 
 import {
   deleteSale,
@@ -68,6 +69,7 @@ function emptyForm(): SaleForm {
 }
 
 export default function SalesPage() {
+  const { activeProject } = useProject()
   const [
     clients,
     setClients,
@@ -106,8 +108,8 @@ export default function SalesPage() {
         storedClients,
         storedSales,
       ] = await Promise.all([
-        getClients(),
-        getSales(),
+        getClients(activeProject!.id),
+        getSales(activeProject!.id),
       ])
 
       setClients(
@@ -121,7 +123,7 @@ export default function SalesPage() {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [activeProject?.id])
 
   const clientMap =
     useMemo(
@@ -246,7 +248,7 @@ export default function SalesPage() {
               .toISOString(),
         }
 
-        await saveSale(
+        await saveSale(activeProject!.id,
           sale,
         )
 
@@ -270,7 +272,7 @@ export default function SalesPage() {
       updated:
         CrmSale,
     ) => {
-      await saveSale(
+      await saveSale(activeProject!.id,
         updated,
       )
 
@@ -295,6 +297,7 @@ export default function SalesPage() {
       sale: CrmSale,
     ) => {
       await deleteSale(
+        activeProject!.id,
         sale.id,
       )
 

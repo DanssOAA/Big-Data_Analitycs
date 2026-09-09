@@ -6,6 +6,7 @@
 import { useLocation } from 'react-router'
 
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 
 import AccountMenu from './AccountMenu'
 
@@ -55,6 +56,7 @@ export default function Topbar({
   const location = useLocation()
 
   const { isAdmin } = useAuth()
+  const { projects, activeProject, setActiveProject } = useProject()
 
   const title = resolveTitle(location.pathname)
 
@@ -89,7 +91,7 @@ export default function Topbar({
         </div>
       </div>
 
-      <AccountMenu />
+      <div className="flex items-center gap-3">{projects.length > 0 && <label className="hidden text-xs text-[var(--text-muted)] sm:block">Proyecto activo<select aria-label="Proyecto activo" value={activeProject?.id ?? ''} onChange={(event) => setActiveProject(projects.find((project) => project.id === event.target.value) ?? null)} className="ml-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--text-primary)]">{projects.map((project)=><option key={project.id} value={project.id}>{project.name}</option>)}</select></label>}<AccountMenu /></div>
     </header>
   )
 }

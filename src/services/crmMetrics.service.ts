@@ -99,8 +99,8 @@ export function computeCrmMetrics(
   }
 }
 
-export async function getCrmMetricsSnapshot(): Promise<CrmMetricsSnapshot> {
-  const sales = await getSales()
+export async function getCrmMetricsSnapshot(projectId: string): Promise<CrmMetricsSnapshot> {
+  const sales = await getSales(projectId)
 
   return computeCrmMetrics(sales)
 }

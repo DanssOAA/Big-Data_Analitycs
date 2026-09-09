@@ -304,6 +304,7 @@ ${RESPONSE_SCHEMA_HINT}`
 }
 
 interface SaveInsightInput {
+  projectId: string
   analysis: AiAnalysisResult
   comparisonMode: ComparisonMode
   datasetId: string | null
@@ -314,6 +315,7 @@ interface SaveInsightInput {
 }
 
 interface InsightRow {
+  project_id: string
   id: string
   dataset_id: string | null
   table_id: string | null
@@ -371,6 +373,7 @@ function fromRow(
 }
 
 export async function saveInsight({
+  projectId,
   analysis,
   comparisonMode,
   datasetId,
@@ -387,6 +390,7 @@ export async function saveInsight({
     await supabase
       .from('insights')
       .insert({
+        project_id: projectId,
         dataset_id: datasetId,
         table_id: tableId,
         compared_dataset_id:
@@ -426,6 +430,7 @@ export async function saveInsight({
 }
 
 export async function publishInsight(
+  projectId: string,
   id: string,
   published: boolean,
 ): Promise<void> {
@@ -437,6 +442,7 @@ export async function publishInsight(
         ? new Date().toISOString()
         : null,
     })
+    .eq('project_id', projectId)
     .eq('id', id)
 
   if (error) {
@@ -445,6 +451,7 @@ export async function publishInsight(
 }
 
 export async function listInsights(
+  projectId: string,
   options: {
     onlyPublished?: boolean
   } = {},
@@ -452,6 +459,7 @@ export async function listInsights(
   let query = supabase
     .from('insights')
     .select('*')
+    .eq('project_id', projectId)
     .order('created_at', {
       ascending: false,
     })
@@ -475,6 +483,7 @@ export async function listInsights(
 }
 
 export async function getInsight(
+  projectId: string,
   id: string,
 ): Promise<
   InsightRecord | undefined
@@ -483,6 +492,7 @@ export async function getInsight(
     await supabase
       .from('insights')
       .select('*')
+      .eq('project_id', projectId)
       .eq('id', id)
       .maybeSingle()
 

@@ -143,6 +143,7 @@ export interface BulkImportResult {
  * reales de la empresa.
  */
 export async function importHistoricalTable(
+  projectId: string,
   table: DatasetTable,
   onProgress?: (
     progress: BulkImportProgress,
@@ -166,7 +167,7 @@ export async function importHistoricalTable(
   // ---------------------------------------------------
 
   const existingClients =
-    await getClients()
+    await getClients(projectId)
 
   const clientIndex = new Map<
     string,
@@ -230,7 +231,7 @@ export async function importHistoricalTable(
         new Date().toISOString(),
     }
 
-    await saveClient(newClient)
+    await saveClient(projectId, newClient)
 
     clientIndex.set(key, newClient.id)
 
@@ -354,7 +355,7 @@ export async function importHistoricalTable(
   // ---------------------------------------------------
 
   const existingProducts =
-    await getProducts()
+    await getProducts(projectId)
 
   const productIndex = new Set(
     existingProducts.map((product) =>
@@ -425,7 +426,7 @@ export async function importHistoricalTable(
       .insert(
         newProducts.map(
           (product) => ({
-            id: product.id,
+            id: product.id, project_id: projectId,
             code: product.code,
             name: product.name,
             category:
@@ -457,7 +458,7 @@ export async function importHistoricalTable(
 
   const saleRows = baseRows.map(
     (row, index) => ({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), project_id: projectId,
       code: `VTA-${stamp}-${index + 1}`,
       client_id: row.clientId,
       product: row.cargoType,
@@ -502,7 +503,7 @@ export async function importHistoricalTable(
 
   const shipmentRows = baseRows.map(
     (row, index) => ({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), project_id: projectId,
       code: `ENV-${stamp}-${index + 1}`,
       client_id: row.clientId,
       origin: row.origin,

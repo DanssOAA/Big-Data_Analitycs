@@ -14,6 +14,7 @@ import {
 } from 'react'
 
 import ClientDetailModal from '../../components/crm/ClientDetailModal'
+import { useProject } from '../../context/ProjectContext'
 
 import {
   deleteClient,
@@ -55,6 +56,7 @@ function emptyForm(): ClientForm {
 }
 
 export default function ClientsPage() {
+  const { activeProject } = useProject()
   const [clients, setClients] = useState<CrmClient[]>([])
   const [sales, setSales] = useState<CrmSale[]>([])
 
@@ -78,8 +80,8 @@ export default function ClientsPage() {
       storedClients,
       storedSales,
     ] = await Promise.all([
-      getClients(),
-      getSales(),
+      getClients(activeProject!.id),
+      getSales(activeProject!.id),
     ])
 
     setClients(storedClients)
@@ -88,7 +90,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [activeProject?.id])
 
   const filteredClients =
     useMemo(() => {
@@ -201,7 +203,7 @@ export default function ClientsPage() {
             .toISOString(),
       }
 
-      await saveClient(
+      await saveClient(activeProject!.id,
         client,
       )
 
@@ -223,7 +225,7 @@ export default function ClientsPage() {
     async (
       updated: CrmClient,
     ) => {
-      await saveClient(
+      await saveClient(activeProject!.id,
         updated,
       )
 
@@ -261,6 +263,7 @@ export default function ClientsPage() {
       }
 
       await deleteClient(
+        activeProject!.id,
         client.id,
       )
 

@@ -63,7 +63,7 @@ export function parseNumericValue(
 
   text = text
     .replace(/\s/g, '')
-    .replace(/[^\d,.\-]/g, '')
+    .replace(/[^\d,.-]/g, '')
 
   if (!text || text === '-') {
     return null

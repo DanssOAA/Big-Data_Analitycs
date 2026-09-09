@@ -11,6 +11,7 @@ import type {
 import type { DatasetTable } from '../types/dataset.types'
 
 interface ShipmentRow {
+  project_id: string
   id: string
   code: string
   client_id: string | null
@@ -55,7 +56,7 @@ function fromRow(
   }
 }
 
-export async function getShipments(): Promise<
+export async function getShipments(projectId: string): Promise<
   Shipment[]
 > {
   const rows =
@@ -64,6 +65,7 @@ export async function getShipments(): Promise<
         supabase
           .from('shipments')
           .select('*')
+          .eq('project_id', projectId)
           .order(
             'shipped_date',
             {
@@ -77,12 +79,13 @@ export async function getShipments(): Promise<
 }
 
 export async function saveShipment(
+  projectId: string,
   shipment: Shipment,
 ): Promise<void> {
   const { error } = await supabase
     .from('shipments')
     .upsert({
-      id: shipment.id,
+      id: shipment.id, project_id: projectId,
       code: shipment.code,
       client_id:
         shipment.clientId || null,
@@ -112,11 +115,13 @@ export async function saveShipment(
 }
 
 export async function deleteShipment(
+  projectId: string,
   shipmentId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('shipments')
     .delete()
+    .eq('project_id', projectId)
     .eq('id', shipmentId)
 
   if (error) {

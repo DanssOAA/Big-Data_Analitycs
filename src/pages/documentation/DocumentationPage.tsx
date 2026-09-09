@@ -1,6 +1,7 @@
 import { ExternalLink, Eye, FilePenLine, FileText, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 import {
   deleteDocument, getDocuments, getDocumentUrl, updateDocument, uploadDocument,
   type DocumentRecord,
@@ -12,6 +13,7 @@ const size = (bytes: number) => bytes < 1024 * 1024
 
 export default function DocumentationPage() {
   const { can } = useAuth()
+  const { activeProject } = useProject()
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -26,8 +28,8 @@ export default function DocumentationPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
-    void getDocuments().then(setDocuments).catch(() => setError('No se pudo cargar la documentación.')).finally(() => setLoading(false))
-  }, [])
+    void getDocuments(activeProject!.id).then(setDocuments).catch(() => setError('No se pudo cargar la documentación.')).finally(() => setLoading(false))
+  }, [activeProject?.id])
 
   const close = () => { setModal(null); setSelected(null); setFile(null); setName(''); setDescription(''); setError('') }
   const submit = async (event: FormEvent) => {
@@ -39,10 +41,10 @@ export default function DocumentationPage() {
     setBusy(true); setError('')
     try {
       if (modal === 'upload' && file) {
-        const created = await uploadDocument(file, description)
+        const created = await uploadDocument(activeProject!.id, file, description)
         setDocuments((current) => [created, ...current])
       } else if (selected && name.trim()) {
-        const updated = await updateDocument(selected.id, name, description)
+        const updated = await updateDocument(activeProject!.id, selected.id, name, description)
         setDocuments((current) => current.map((item) => item.id === updated.id ? updated : item))
       }
       close()
@@ -54,7 +56,7 @@ export default function DocumentationPage() {
   const remove = async (document: DocumentRecord) => {
     if (!window.confirm(`¿Eliminar "${document.name}" permanentemente?`)) return
     try {
-      await deleteDocument(document)
+      await deleteDocument(activeProject!.id, document)
       setDocuments((current) => current.filter((item) => item.id !== document.id))
     } catch { setError('No se pudo eliminar el documento.') }
   }

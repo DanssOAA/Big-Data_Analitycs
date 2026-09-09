@@ -75,7 +75,7 @@ export default function DatasetCard({
 
         <div className="min-w-0 flex-1">
           <Link
-            to={`/admin/insights/dataset/${dataset.id}`}
+            to={`/app/datasets/${dataset.id}`}
             className="block truncate text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--accent)]"
           >
             {dataset.name}
@@ -233,7 +233,7 @@ export default function DatasetCard({
         </div>
 
         <Link
-          to={`/admin/insights/dataset/${dataset.id}`}
+          to={`/app/datasets/${dataset.id}`}
           className="text-xs font-semibold text-[var(--accent)]"
         >
           Abrir dataset

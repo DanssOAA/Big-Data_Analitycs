@@ -17,6 +17,7 @@ import {
 } from '../../services/activitiesStorage.service'
 
 import { getClients } from '../../services/crmStorage.service'
+import { useProject } from '../../context/ProjectContext'
 
 import type {
   CrmActivity,
@@ -62,6 +63,7 @@ function emptyForm(): ActivityForm {
 }
 
 export default function ActivitiesPage() {
+  const { activeProject } = useProject()
   const [
     activities,
     setActivities,
@@ -96,8 +98,8 @@ export default function ActivitiesPage() {
         storedActivities,
         storedClients,
       ] = await Promise.all([
-        getActivities(),
-        getClients(),
+        getActivities(activeProject!.id),
+        getClients(activeProject!.id),
       ])
 
       setActivities(
@@ -109,7 +111,7 @@ export default function ActivitiesPage() {
     }
 
     void loadData()
-  }, [])
+  }, [activeProject?.id])
 
   const clientMap = useMemo(
     () =>
@@ -153,7 +155,7 @@ export default function ActivitiesPage() {
           new Date().toISOString(),
       }
 
-      await saveActivity(activity)
+      await saveActivity(activeProject!.id, activity)
 
       setActivities(
         (current) => [

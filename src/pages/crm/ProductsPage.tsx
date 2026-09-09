@@ -13,6 +13,7 @@ import {
 } from 'react'
 
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 
 import {
   deleteProduct,
@@ -48,6 +49,7 @@ function emptyForm(): ProductForm {
 
 export default function ProductsPage() {
   const { isAdmin } = useAuth()
+  const { activeProject } = useProject()
 
   const [
     products,
@@ -78,14 +80,14 @@ export default function ProductsPage() {
   useEffect(() => {
     const load = async () => {
       const stored =
-        await getProducts()
+        await getProducts(activeProject!.id)
 
       setProducts(stored)
       setLoading(false)
     }
 
     void load()
-  }, [])
+  }, [activeProject?.id])
 
   const filteredProducts =
     useMemo(() => {
@@ -142,7 +144,7 @@ export default function ProductsPage() {
           new Date().toISOString(),
       }
 
-      await saveProduct(product)
+      await saveProduct(activeProject!.id, product)
 
       setProducts((current) => [
         product,
@@ -172,7 +174,7 @@ export default function ProductsPage() {
       ),
     )
 
-    await saveProduct(updated)
+    await saveProduct(activeProject!.id, updated)
   }
 
   const removeProduct = async (
@@ -187,7 +189,7 @@ export default function ProductsPage() {
       return
     }
 
-    await deleteProduct(product.id)
+      await deleteProduct(activeProject!.id, product.id)
 
     setProducts((current) =>
       current.filter(

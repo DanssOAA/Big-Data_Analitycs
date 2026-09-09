@@ -29,6 +29,7 @@ import {
 import { detectShipmentColumns } from '../../services/shipmentsStorage.service'
 
 import DangerZoneMenu from './DangerZoneMenu'
+import { useProject } from '../../context/ProjectContext'
 
 type ImportMode =
   | 'products'
@@ -51,6 +52,7 @@ const STAGE_LABELS: Record<
 }
 
 export default function BulkUploadCard() {
+  const { activeProject } = useProject()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [mode, setMode] =
@@ -121,6 +123,7 @@ export default function BulkUploadCard() {
         if (mode === 'products') {
           const result =
             await importProductsFromFile(
+              activeProject!.id,
               file,
               showProductProgress,
             )
@@ -150,7 +153,7 @@ export default function BulkUploadCard() {
 
         for (const table of historicalTables) {
           const result =
-            await importHistoricalTable(
+            await importHistoricalTable(activeProject!.id,
               table,
               showHistoricalProgress,
             )

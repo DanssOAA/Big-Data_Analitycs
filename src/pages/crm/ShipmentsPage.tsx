@@ -14,6 +14,7 @@ import {
 } from 'react'
 
 import { useAuth } from '../../context/AuthContext'
+import { useProject } from '../../context/ProjectContext'
 
 import { getClients } from '../../services/crmStorage.service'
 
@@ -91,6 +92,7 @@ const statusStyles: Record<
 
 export default function ShipmentsPage() {
   const { isAdmin } = useAuth()
+  const { activeProject } = useProject()
 
   const [
     shipments,
@@ -129,8 +131,8 @@ export default function ShipmentsPage() {
         storedShipments,
         storedClients,
       ] = await Promise.all([
-        getShipments(),
-        getClients(),
+        getShipments(activeProject!.id),
+        getClients(activeProject!.id),
       ])
 
       setShipments(
@@ -141,7 +143,7 @@ export default function ShipmentsPage() {
     }
 
     void load()
-  }, [])
+  }, [activeProject?.id])
 
   const clientMap = useMemo(
     () =>
@@ -222,7 +224,7 @@ export default function ShipmentsPage() {
           new Date().toISOString(),
       }
 
-      await saveShipment(
+      await saveShipment(activeProject!.id,
         shipment,
       )
 
@@ -250,7 +252,7 @@ export default function ShipmentsPage() {
       return
     }
 
-    await deleteShipment(
+      await deleteShipment(activeProject!.id,
       shipment.id,
     )
 

@@ -33,6 +33,7 @@ interface AuthContextValue {
   isAdmin: boolean
   permissions: PermissionMap
   can: (module: AppModule, action?: PermissionAction) => boolean
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -53,7 +54,7 @@ async function mapUser(
   const { data: profile } =
     await supabase
       .from('profiles')
-      .select('full_name, role')
+      .select('full_name, role, must_change_password')
       .eq('id', supabaseUser.id)
       .maybeSingle()
 
@@ -76,6 +77,7 @@ async function mapUser(
     name,
     email: supabaseUser.email ?? '',
     role,
+    mustChangePassword: profile?.must_change_password === true,
   }
 }
 
@@ -184,6 +186,13 @@ export function AuthProvider({
     setPermissions(emptyPermissions())
   }
 
+  const refreshUser = async () => {
+    const { data } = await supabase.auth.getUser()
+    const mappedUser = await mapUser(data.user)
+    setUser(mappedUser)
+    await loadPermissions(mappedUser)
+  }
+
   const value = useMemo(
     () => ({
       user,
@@ -194,6 +203,7 @@ export function AuthProvider({
       permissions,
       can: (module: AppModule, action: PermissionAction = 'view') =>
         user?.role === 'admin' || permissions[module][action],
+      refreshUser,
     }),
     [user, loading, permissions],
   )

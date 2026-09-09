@@ -7,6 +7,7 @@ import { supabase } from './supabaseClient'
 import type { CrmActivity } from '../types/crm.types'
 
 interface ActivityRow {
+  project_id: string
   id: string
   client_id: string | null
   type: string
@@ -28,7 +29,7 @@ function fromRow(
   }
 }
 
-export async function getActivities(): Promise<
+export async function getActivities(projectId: string): Promise<
   CrmActivity[]
 > {
   const rows =
@@ -37,6 +38,7 @@ export async function getActivities(): Promise<
         supabase
           .from('activities')
           .select('*')
+          .eq('project_id', projectId)
           .order(
             'activity_date',
             {
@@ -50,12 +52,13 @@ export async function getActivities(): Promise<
 }
 
 export async function saveActivity(
+  projectId: string,
   activity: CrmActivity,
 ): Promise<void> {
   const { error } = await supabase
     .from('activities')
     .upsert({
-      id: activity.id,
+      id: activity.id, project_id: projectId,
       client_id:
         activity.clientId || null,
       type: activity.type,
@@ -73,11 +76,13 @@ export async function saveActivity(
 }
 
 export async function deleteActivity(
+  projectId: string,
   activityId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from('activities')
     .delete()
+    .eq('project_id', projectId)
     .eq('id', activityId)
 
   if (error) {

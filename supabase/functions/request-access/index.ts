@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendEmail } from '../_shared/resend.ts'
 import { findAuthUserByEmail } from '../_shared/auth-users.ts'
+import { escapeHtml } from '../_shared/html.ts'
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -20,7 +21,8 @@ Deno.serve(async (request) => {
     const { error } = await admin.from('access_requests').insert({ first_name:firstName,last_name:lastName,email,message })
     if (error) { if (error.code==='23505') return json({ message:'Tu solicitud ya está pendiente de revisión.' }); throw error }
     const { data: admins } = await admin.from('profiles').select('email').eq('role','admin')
-    await Promise.allSettled((admins??[]).map((profile) => sendEmail(profile.email,'Nueva solicitud de acceso a Kargia',`<h2>Nueva solicitud</h2><p><strong>${firstName} ${lastName}</strong> (${email}) solicitó acceso.</p><p>${message??'Sin mensaje.'}</p><p><a href="${Deno.env.get('APP_URL')??''}/admin/solicitudes">Revisar solicitud</a></p>`)))
+    const appUrl = escapeHtml(Deno.env.get('APP_URL') ?? '')
+    await Promise.allSettled((admins??[]).map((profile) => sendEmail(profile.email,'Nueva solicitud de acceso a Kargia',`<h2>Nueva solicitud</h2><p><strong>${escapeHtml(firstName)} ${escapeHtml(lastName)}</strong> (${escapeHtml(email)}) solicitó acceso.</p><p>${escapeHtml(message ?? 'Sin mensaje.')}</p><p><a href="${appUrl}/admin/solicitudes">Revisar solicitud</a></p>`)))
     return json({ message: 'Solicitud enviada correctamente.' }, 201)
   } catch { return json({ error: 'No se pudo procesar la solicitud.' }, 500) }
 })

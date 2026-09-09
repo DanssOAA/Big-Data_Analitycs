@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendEmail } from '../_shared/resend.ts'
 import { findAuthUserByEmail } from '../_shared/auth-users.ts'
+import { escapeHtml } from '../_shared/html.ts'
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok',{headers:corsHeaders})
@@ -18,7 +19,7 @@ Deno.serve(async (request) => {
     if(!accessRequest||accessRequest.status!=='pending')return json({error:'La solicitud ya fue revisada.'},409)
     if(decision==='rejected'){
       const {data:updated,error}=await admin.from('access_requests').update({status:'rejected',reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',requestId).eq('status','pending').select('id').maybeSingle(); if(error||!updated)return json({error:'La solicitud cambió mientras se procesaba.'},409)
-      await sendEmail(accessRequest.email,'Solicitud de acceso a Kargia',`<p>Hola ${accessRequest.first_name},</p><p>Tu solicitud de acceso fue rechazada.</p>`).catch(()=>undefined); return json({ok:true})
+      await sendEmail(accessRequest.email,'Solicitud de acceso a Kargia',`<p>Hola ${escapeHtml(accessRequest.first_name)},</p><p>Tu solicitud de acceso fue rechazada.</p>`).catch(()=>undefined); return json({ok:true})
     }
     const [authUser,{data:profiles}]=await Promise.all([findAuthUserByEmail(admin,accessRequest.email),admin.from('profiles').select('id').ilike('email',accessRequest.email).limit(1)]); if(authUser||profiles?.length)return json({error:'El correo ya corresponde a un usuario.'},409)
     const {data:created,error:createError}=await admin.auth.admin.createUser({email:accessRequest.email,password:temporaryPassword,email_confirm:true,user_metadata:{full_name:`${accessRequest.first_name} ${accessRequest.last_name}`,role:'worker'}})
@@ -27,7 +28,7 @@ Deno.serve(async (request) => {
     if(profileError){await admin.auth.admin.deleteUser(created.user.id);return json({error:'No se pudo preparar el perfil.'},500)}
     const {data:updated,error:updateError}=await admin.from('access_requests').update({status:'approved',reviewed_by:user.id,reviewed_at:new Date().toISOString(),created_user_id:created.user.id}).eq('id',requestId).eq('status','pending').select('id').maybeSingle()
     if(updateError||!updated){await admin.auth.admin.deleteUser(created.user.id);return json({error:'La solicitud cambió mientras se procesaba.'},409)}
-    await sendEmail(accessRequest.email,'Tu solicitud de acceso fue aceptada',`<p>Hola ${accessRequest.first_name},</p><p>Tu solicitud ha sido aceptada.</p><p>Estas son tus credenciales. Por favor, no las compartas.</p><p>Correo: <strong>${accessRequest.email}</strong><br>Contraseña temporal: <strong>${temporaryPassword}</strong></p><p>Al ingresar deberás cambiar tu contraseña.</p><p><a href="${Deno.env.get('APP_URL')??''}/login">Ingresar a Kargia</a></p>`).catch(()=>undefined)
+    await sendEmail(accessRequest.email,'Tu solicitud de acceso fue aceptada',`<p>Hola ${escapeHtml(accessRequest.first_name)},</p><p>Tu solicitud ha sido aceptada.</p><p>Estas son tus credenciales. Por favor, no las compartas.</p><p>Correo: <strong>${escapeHtml(accessRequest.email)}</strong><br>Contraseña temporal: <strong>${escapeHtml(temporaryPassword)}</strong></p><p>Al ingresar deberás cambiar tu contraseña.</p><p><a href="${escapeHtml(Deno.env.get('APP_URL') ?? '')}/login">Ingresar a Kargia</a></p>`).catch(()=>undefined)
     return json({ok:true})
   } catch { return json({error:'No se pudo revisar la solicitud.'},500) }
 })

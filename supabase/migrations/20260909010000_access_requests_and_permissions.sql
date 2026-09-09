@@ -19,6 +19,9 @@ create policy admin_read_access_requests on public.access_requests for select to
 alter table public.user_permissions drop constraint if exists user_permissions_module_check;
 alter table public.user_permissions add constraint user_permissions_module_check check (module in ('dashboard','clients','sales','products','shipments','activities','insights','documentation','datasets'));
 delete from public.user_permissions where module in ('doc_projects','audit');
+insert into public.user_permissions(user_id,module,can_view,can_create,can_update,can_delete)
+select id,'datasets',role='analyst',role='analyst',false,false from public.profiles where role<>'admin'
+on conflict(user_id,module) do nothing;
 
 create or replace function public.seed_user_permissions() returns trigger language plpgsql security definer set search_path=public as $$
 begin

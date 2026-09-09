@@ -109,6 +109,11 @@ export async function uploadDataset(
 
   const parsed =
     await parseDatasetFile(file)
+  const safeFileName = file.name.replace(
+    /[^a-zA-Z0-9._-]/g,
+    '_',
+  )
+  const uploadedStoragePath = `${projectId}/${parsed.id}/${safeFileName}`
 
   const { error: datasetError } =
     await supabase
@@ -122,7 +127,8 @@ export async function uploadDataset(
           parsed.sizeBytes,
         created_at:
           parsed.createdAt,
-        storage_path: null,
+        storage_path:
+          uploadedStoragePath,
         total_rows:
           parsed.totalRows,
         total_columns:
@@ -136,6 +142,23 @@ export async function uploadDataset(
   }
 
   try {
+    const { error: uploadError } =
+      await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(uploadedStoragePath, file, {
+          contentType:
+            file.type || (parsed.extension === 'csv'
+              ? 'text/csv'
+              : parsed.extension === 'xlsx'
+                ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                : 'application/vnd.ms-excel'),
+          upsert: false,
+        })
+
+    if (uploadError) {
+      throw toError(uploadError)
+    }
+
     for (const table of parsed.tables) {
       const { error: tableError } =
         await supabase
@@ -181,6 +204,10 @@ export async function uploadDataset(
       }
     }
   } catch (exception) {
+    await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([uploadedStoragePath])
+
     try {
       await supabase
         .from('datasets')
@@ -195,7 +222,7 @@ export async function uploadDataset(
 
   return {
     ...parsed,
-    storagePath: null,
+    storagePath: uploadedStoragePath,
     sourceType,
     projectId,
     truncated: false,

@@ -1,10 +1,10 @@
-import { ExternalLink, Eye, FilePenLine, FileText, Plus, Trash2, Upload, X } from 'lucide-react'
+import { ExternalLink, Eye, FilePenLine, FileText, LoaderCircle, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useProject } from '../../context/ProjectContext'
 import {
-  deleteDocument, getDocuments, getDocumentUrl, updateDocument, uploadDocument,
-  type DocumentRecord,
+  analyzeDocument, deleteDocument, getDocumentAnalyses, getDocuments, getDocumentUrl, updateDocument, uploadDocument,
+  type DocumentAnalysis, type DocumentRecord,
 } from '../../services/documentationStorage.service'
 
 const size = (bytes: number) => bytes < 1024 * 1024
@@ -26,9 +26,22 @@ export default function DocumentationPage() {
   const [preview, setPreview] = useState<DocumentRecord | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [analyses, setAnalyses] = useState<Record<string, DocumentAnalysis>>({})
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  const [report, setReport] = useState<DocumentAnalysis | null>(null)
 
   useEffect(() => {
-    void getDocuments(activeProject!.id).then(setDocuments).catch(() => setError('No se pudo cargar la documentación.')).finally(() => setLoading(false))
+    const load = async () => {
+      try {
+        const [documentRows, analysisRows] = await Promise.all([
+          getDocuments(activeProject!.id), getDocumentAnalyses(activeProject!.id),
+        ])
+        setDocuments(documentRows)
+        setAnalyses(Object.fromEntries(analysisRows.map((analysis) => [analysis.document_id, analysis])))
+      } catch { setError('No se pudo cargar la documentación.') }
+      finally { setLoading(false) }
+    }
+    void load()
   }, [activeProject?.id])
 
   const close = () => { setModal(null); setSelected(null); setFile(null); setName(''); setDescription(''); setError('') }
@@ -81,12 +94,23 @@ export default function DocumentationPage() {
     setPreviewUrl('')
   }
 
+  const runAnalysis = async (document: DocumentRecord) => {
+    setAnalyzingId(document.id); setError('')
+    try {
+      const analysis = await analyzeDocument(document.id)
+      setAnalyses((current) => ({ ...current, [document.id]: analysis }))
+      setReport(analysis)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'No se pudo analizar el documento.')
+    } finally { setAnalyzingId(null) }
+  }
+
   return <div className="space-y-6">
     <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
         <p className="text-sm font-medium text-[var(--accent)]">Archivos</p>
         <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Documentación</h2>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">Consulta y administra los documentos PDF del sistema.</p>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">Consulta, administra y genera reportes de tus documentos PDF con IA.</p>
       </div>
       {can('documentation', 'create') && <button type="button" onClick={() => setModal('upload')} className="flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17}/> Subir PDF</button>}
     </section>
@@ -95,16 +119,30 @@ export default function DocumentationPage() {
     <section className="overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]">
       {loading ? <p className="p-10 text-center text-sm text-[var(--text-muted)]">Cargando documentos...</p>
         : documents.length === 0 ? <div className="p-12 text-center"><FileText className="mx-auto text-[var(--text-muted)]" size={38}/><p className="mt-3 text-sm text-[var(--text-secondary)]">Todavía no hay documentos PDF.</p></div>
-        : documents.map((document) => <article key={document.id} className="flex flex-col gap-4 border-b border-[var(--border-soft)] p-5 last:border-0 sm:flex-row sm:items-center">
+        : documents.map((document) => { const analysis = analyses[document.id]; return <article key={document.id} className="flex flex-col gap-4 border-b border-[var(--border-soft)] p-5 last:border-0 sm:flex-row sm:items-center">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500"><FileText size={21}/></div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[var(--text-primary)]">{document.name}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{size(document.file_size)} · {new Date(document.created_at).toLocaleDateString('es-MX')}</p>{document.description && <p className="mt-2 text-sm text-[var(--text-secondary)]">{document.description}</p>}</div>
           <div className="flex gap-2">
             <button type="button" onClick={() => void showPreview(document)} title="Previsualizar PDF" className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Eye size={17}/><span className="hidden md:inline">Ver PDF</span></button>
+            {analysis?.status === 'completed' && <button type="button" onClick={() => setReport(analysis)} className="flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 px-3 py-2 text-sm text-[var(--accent)]"><Sparkles size={16}/> Ver reporte</button>}
+            {can('documentation', 'update') && <button type="button" disabled={analyzingId === document.id} onClick={() => void runAnalysis(document)} className="flex items-center gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-2 text-sm text-[var(--accent)] disabled:opacity-60">{analyzingId === document.id ? <LoaderCircle className="animate-spin" size={16}/> : <Sparkles size={16}/>} {analysis ? 'Reanalizar' : 'Analizar con IA'}</button>}
             {can('documentation', 'update') && <button type="button" onClick={() => { setSelected(document); setName(document.name); setDescription(document.description ?? ''); setModal('edit') }} title="Editar datos" className="rounded-lg border border-[var(--border)] p-2 text-[var(--text-secondary)]"><FilePenLine size={17}/></button>}
             {can('documentation', 'delete') && <button type="button" onClick={() => void remove(document)} title="Eliminar" className="rounded-lg border border-rose-500/20 p-2 text-rose-500"><Trash2 size={17}/></button>}
           </div>
-        </article>)}
+        </article>})}
     </section>
+
+    {report && <div className="fixed inset-0 z-[75] overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"><section className="mx-auto my-6 w-full max-w-3xl rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+      <header className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 text-sm font-semibold text-[var(--accent)]"><Sparkles size={17}/> Reporte generado con IA</p><h3 className="mt-1 text-xl font-semibold">Análisis del documento</h3>{report.analyzed_at && <p className="mt-1 text-xs text-[var(--text-muted)]">Analizado el {new Date(report.analyzed_at).toLocaleString()}</p>}</div><button type="button" onClick={() => setReport(null)} aria-label="Cerrar reporte"><X size={20}/></button></header>
+      <div className="mt-6 space-y-5 text-sm">
+        <section><h4 className="font-semibold">Resumen ejecutivo</h4><p className="mt-2 whitespace-pre-wrap text-[var(--text-secondary)]">{report.summary || 'Sin resumen disponible.'}</p></section>
+        {report.keywords.length > 0 && <section><h4 className="font-semibold">Palabras clave</h4><div className="mt-2 flex flex-wrap gap-2">{report.keywords.map((keyword) => <span key={keyword} className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs text-[var(--accent)]">{keyword}</span>)}</div></section>}
+        {report.key_points.length > 0 && <section><h4 className="font-semibold">Puntos principales</h4><ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--text-secondary)]">{report.key_points.map((item) => <li key={item}>{item}</li>)}</ul></section>}
+        {report.risks.length > 0 && <section><h4 className="font-semibold text-amber-600">Riesgos y alertas</h4><ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--text-secondary)]">{report.risks.map((item) => <li key={item}>{item}</li>)}</ul></section>}
+        {report.recommendations.length > 0 && <section><h4 className="font-semibold">Recomendaciones</h4><ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--text-secondary)]">{report.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></section>}
+        <section><h4 className="font-semibold">Conclusión</h4><p className="mt-2 whitespace-pre-wrap text-[var(--text-secondary)]">{report.conclusion || 'Sin conclusión disponible.'}</p></section>
+      </div>
+    </section></div>}
 
     {preview && <div className="fixed inset-0 z-[70] flex flex-col bg-black/75 p-2 backdrop-blur-sm sm:p-5">
       <section className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">

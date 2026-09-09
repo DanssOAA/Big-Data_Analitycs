@@ -38,13 +38,17 @@ supabase secrets set BREVO_API_KEY="TU_API_KEY"
 supabase secrets set BREVO_SENDER_EMAIL="tu-remitente-configurado@example.com"
 supabase secrets set BREVO_SENDER_NAME="Kargia"
 supabase secrets set APP_URL=https://app.tu-dominio.com
+supabase secrets set GEMINI_API_KEY="TU_API_KEY" # análisis seguro de PDFs
 supabase functions deploy request-access --no-verify-jwt
 supabase functions deploy review-access-request
 supabase functions deploy change-required-password
+supabase functions deploy analyze-document
 supabase functions delete create-user
 ```
 
 Supabase inyecta `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en Edge Functions. `request-access` es pública; `review-access-request` exige JWT y vuelve a comprobar `profiles.role = 'admin'`.
+
+El análisis de PDFs usa `GEMINI_API_KEY` exclusivamente en la Edge Function `analyze-document`. No agregues ese secreto con prefijo `VITE_` para este flujo.
 
 Estas variables son secretos de Supabase Edge Functions y no pertenecen al `.env` del frontend. En Brevo, configura y verifica `BREVO_SENDER_EMAIL`; no es obligatorio usar un dominio propio si la cuenta gratuita permite y verifica ese remitente. Los avisos se envían individualmente a cada admin para no revelar destinatarios. Después de comprobar Brevo, los secretos antiguos `RESEND_API_KEY` y `RESEND_FROM_EMAIL` pueden eliminarse manualmente.
 

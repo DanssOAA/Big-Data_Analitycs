@@ -11,10 +11,44 @@ export interface DocumentRecord {
   project_id: string
 }
 
+export interface DocumentAnalysis {
+  id: string
+  document_id: string
+  project_id: string
+  status: 'processing' | 'completed' | 'failed'
+  summary: string | null
+  keywords: string[]
+  key_points: string[]
+  risks: string[]
+  recommendations: string[]
+  conclusion: string | null
+  error_message: string | null
+  analyzed_at: string | null
+  updated_at: string
+}
+
 export async function getDocuments(projectId: string) {
   const { data, error } = await supabase.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as DocumentRecord[]
+}
+
+export async function getDocumentAnalyses(projectId: string) {
+  const { data, error } = await supabase.from('document_analyses').select('*').eq('project_id', projectId)
+  if (error) throw error
+  return (data ?? []) as DocumentAnalysis[]
+}
+
+export async function analyzeDocument(documentId: string) {
+  const { data, error } = await supabase.functions.invoke<{
+    analysis?: DocumentAnalysis
+    error?: string
+  }>('analyze-document', { body: { documentId } })
+
+  if (error || !data?.analysis) {
+    throw new Error(data?.error ?? 'No se pudo analizar el documento.')
+  }
+  return data.analysis
 }
 
 export async function uploadDocument(projectId: string, file: File, description: string) {

@@ -25,17 +25,18 @@ VITE_SUPABASE_ANON_KEY=...
 VITE_GEMINI_API_KEY=... # integración actual de IA
 ```
 
-Nunca añadas `SUPABASE_SERVICE_ROLE_KEY` ni `RESEND_API_KEY` a variables `VITE_*`.
+Nunca añadas `SUPABASE_SERVICE_ROLE_KEY` ni `BREVO_API_KEY` a variables `VITE_*`.
 
-## Despliegue de Supabase y Resend
+## Despliegue de Supabase y Brevo
 
 Aplica las migraciones en orden después de probarlas en staging. La migración de workspaces aborta si no existe un perfil admin y crea `Proyecto General` para el backfill antes de imponer `NOT NULL`.
 
 ```bash
 supabase link --project-ref PROJECT_REF
 supabase db push
-supabase secrets set RESEND_API_KEY=re_xxx
-supabase secrets set RESEND_FROM_EMAIL="Kargia <acceso@tu-dominio.com>"
+supabase secrets set BREVO_API_KEY="TU_API_KEY"
+supabase secrets set BREVO_SENDER_EMAIL="tu-remitente-configurado@example.com"
+supabase secrets set BREVO_SENDER_NAME="Kargia"
 supabase secrets set APP_URL=https://app.tu-dominio.com
 supabase functions deploy request-access --no-verify-jwt
 supabase functions deploy review-access-request
@@ -45,7 +46,7 @@ supabase functions delete create-user
 
 Supabase inyecta `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en Edge Functions. `request-access` es pública; `review-access-request` exige JWT y vuelve a comprobar `profiles.role = 'admin'`.
 
-En Resend, verifica el dominio de `RESEND_FROM_EMAIL` y configura SPF/DKIM. Los avisos se envían individualmente a cada admin para no revelar destinatarios.
+Estas variables son secretos de Supabase Edge Functions y no pertenecen al `.env` del frontend. En Brevo, configura y verifica `BREVO_SENDER_EMAIL`; no es obligatorio usar un dominio propio si la cuenta gratuita permite y verifica ese remitente. Los avisos se envían individualmente a cada admin para no revelar destinatarios. Después de comprobar Brevo, los secretos antiguos `RESEND_API_KEY` y `RESEND_FROM_EMAIL` pueden eliminarse manualmente.
 
 ## Migraciones nuevas
 

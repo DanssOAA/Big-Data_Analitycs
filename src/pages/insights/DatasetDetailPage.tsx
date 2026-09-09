@@ -49,6 +49,7 @@ import type {
   DatasetTable,
 } from '../../types/dataset.types'
 import { useProject } from '../../context/ProjectContext'
+import { useAuth } from '../../context/AuthContext'
 
 type ViewMode =
   | 'dashboard'
@@ -64,6 +65,9 @@ export default function DatasetDetailPage() {
   const navigate = useNavigate()
 
   const { activeProject } = useProject()
+  const { can } = useAuth()
+  const canUpdateDataset = can('datasets', 'update')
+  const canCreateInsight = can('insights', 'create')
 
   const [
     dataset,
@@ -288,6 +292,11 @@ export default function DatasetDetailPage() {
 
   const runComparison =
     async () => {
+      if (!canCreateInsight) {
+        setCompareError('No tienes permiso para crear insights.')
+        return
+      }
+
       if (!selectedTable) {
         return
       }
@@ -552,7 +561,7 @@ export default function DatasetDetailPage() {
           Datos
         </button>
 
-        <button
+        {canUpdateDataset && <button
           type="button"
           onClick={() =>
             setView(
@@ -568,7 +577,7 @@ export default function DatasetDetailPage() {
         >
           <Columns3 size={16} />
           Columnas
-        </button>
+        </button>}
       </section>
 
       {dataset.tables.length >
@@ -700,7 +709,8 @@ export default function DatasetDetailPage() {
                   type="button"
                   disabled={
                     comparing ||
-                    !compareTarget
+                    !compareTarget ||
+                    !canCreateInsight
                   }
                   onClick={
                     runComparison
@@ -751,12 +761,15 @@ export default function DatasetDetailPage() {
               selectedTable
             }
             onCellChange={
-              saveCell
+              canUpdateDataset
+                ? saveCell
+                : undefined
             }
           />
         )}
 
       {selectedTable &&
+        canUpdateDataset &&
         view ===
           'columns' && (
           <DatasetSchemaEditor

@@ -39,6 +39,7 @@ supabase secrets set RESEND_FROM_EMAIL="Kargia <acceso@tu-dominio.com>"
 supabase secrets set APP_URL=https://app.tu-dominio.com
 supabase functions deploy request-access --no-verify-jwt
 supabase functions deploy review-access-request
+supabase functions deploy change-required-password
 supabase functions delete create-user
 ```
 

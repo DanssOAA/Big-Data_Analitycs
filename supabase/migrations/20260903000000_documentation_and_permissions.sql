@@ -29,7 +29,8 @@ begin
     raise exception 'Migración cancelada: existen roles no compatibles: %', unexpected_roles;
   end if;
 
-  if not exists (select 1 from public.profiles where role = 'admin') then
+  if exists (select 1 from public.profiles)
+     and not exists (select 1 from public.profiles where role = 'admin') then
     raise exception 'Migración cancelada: no existe ningún perfil con rol admin';
   end if;
 end $$;

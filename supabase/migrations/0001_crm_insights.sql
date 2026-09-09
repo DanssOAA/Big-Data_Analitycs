@@ -27,6 +27,30 @@ $$;
 --    del archivo, junto con activities/products/shipments)
 -- ---------------------------------------------------------
 
+create table if not exists public.clients (
+  id text primary key,
+  code text not null,
+  name text not null,
+  company text not null,
+  email text not null,
+  phone text default '',
+  status text not null default 'Activo',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.sales (
+  id text primary key,
+  code text not null,
+  client_id text references public.clients(id) on delete set null,
+  product text not null,
+  quantity integer not null default 1,
+  unit_price numeric not null default 0,
+  amount numeric not null default 0,
+  date text not null,
+  status text not null default 'Pendiente',
+  created_at timestamptz not null default now()
+);
+
 alter table public.clients enable row level security;
 alter table public.sales enable row level security;
 
@@ -48,6 +72,31 @@ alter table public.activities enable row level security;
 -- ---------------------------------------------------------
 -- 3. datasets: columna source_type (mis datos / competencia)
 -- ---------------------------------------------------------
+
+create table if not exists public.datasets (
+  id text primary key,
+  name text not null,
+  extension text not null,
+  size_bytes bigint not null default 0,
+  created_at timestamptz not null default now(),
+  storage_path text,
+  total_rows integer not null default 0,
+  total_columns integer not null default 0
+);
+
+create table if not exists public.dataset_tables (
+  id text primary key,
+  dataset_id text not null references public.datasets(id) on delete cascade,
+  name text not null,
+  columns jsonb not null default '[]'::jsonb
+);
+
+create table if not exists public.dataset_rows (
+  id bigint generated always as identity primary key,
+  table_id text not null references public.dataset_tables(id) on delete cascade,
+  row_number integer not null,
+  data jsonb not null
+);
 
 alter table public.datasets
   add column if not exists source_type text not null default 'external';

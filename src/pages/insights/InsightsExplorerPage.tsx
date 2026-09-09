@@ -403,6 +403,8 @@ export default function InsightsExplorerPage() {
               <DatasetCard
                 key={dataset.id}
                 dataset={dataset}
+                canUpdate={can('datasets', 'update')}
+                canDelete={can('datasets', 'delete')}
                 onDelete={handleDelete}
                 onSourceTypeChange={
                   handleSourceTypeChange

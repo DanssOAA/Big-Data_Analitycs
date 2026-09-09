@@ -14,6 +14,8 @@ import type {
 
 interface DatasetCardProps {
   dataset: DatasetRecord
+  canUpdate: boolean
+  canDelete: boolean
   onDelete: (
     id: string,
   ) => void
@@ -44,6 +46,8 @@ function formatSize(
 
 export default function DatasetCard({
   dataset,
+  canUpdate,
+  canDelete,
   onDelete,
   onSourceTypeChange,
 }: DatasetCardProps) {
@@ -95,7 +99,7 @@ export default function DatasetCard({
           </p>
         </div>
 
-        <button
+        {canDelete && <button
           type="button"
           onClick={() =>
             onDelete(
@@ -106,12 +110,12 @@ export default function DatasetCard({
           className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-rose-500/10 hover:text-rose-500"
         >
           <Trash2 size={16} />
-        </button>
+        </button>}
       </div>
 
       {previewColumns.length > 0 && (
         <div className="mx-5 overflow-hidden rounded-xl border border-[var(--border-soft)]">
-          <div
+          {canUpdate && <div
             className="grid bg-[var(--surface-elevated)]"
             style={{
               gridTemplateColumns:
@@ -131,7 +135,7 @@ export default function DatasetCard({
                 </div>
               ),
             )}
-          </div>
+          </div>}
 
           {previewRows.map(
             (row, rowIndex) => (

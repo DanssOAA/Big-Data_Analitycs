@@ -1,6 +1,7 @@
 begin;
 
 alter table public.profiles add column if not exists must_change_password boolean not null default false;
+drop function if exists public.complete_required_password_change();
 
 create table if not exists public.access_requests (
   id uuid primary key default gen_random_uuid(), first_name text not null check (char_length(first_name) between 1 and 100),
@@ -17,8 +18,8 @@ drop policy if exists admin_read_access_requests on public.access_requests;
 create policy admin_read_access_requests on public.access_requests for select to authenticated using (public.is_admin());
 
 alter table public.user_permissions drop constraint if exists user_permissions_module_check;
-alter table public.user_permissions add constraint user_permissions_module_check check (module in ('dashboard','clients','sales','products','shipments','activities','insights','documentation','datasets'));
 delete from public.user_permissions where module in ('doc_projects','audit');
+alter table public.user_permissions add constraint user_permissions_module_check check (module in ('dashboard','clients','sales','products','shipments','activities','insights','documentation','datasets'));
 insert into public.user_permissions(user_id,module,can_view,can_create,can_update,can_delete)
 select id,'datasets',role='analyst',role='analyst',false,false from public.profiles where role<>'admin'
 on conflict(user_id,module) do nothing;
@@ -36,12 +37,22 @@ begin
   end if; return new;
 end $$;
 
-create or replace function public.complete_required_password_change() returns void language plpgsql security definer set search_path='' as $$
+create or replace function public.sync_changed_role_permissions() returns trigger language plpgsql security definer set search_path=public as $$
 begin
-  update public.profiles set must_change_password=false where id=(select auth.uid()) and must_change_password=true;
-  if not found then raise exception 'No hay un cambio de contraseña pendiente'; end if;
+  if old.role is distinct from new.role and new.role in ('worker','analyst') then
+    insert into public.user_permissions(user_id,module,can_view,can_create,can_update,can_delete)
+    values
+      (new.id,'datasets',new.role='analyst',new.role='analyst',false,false),
+      (new.id,'insights',true,new.role='analyst',new.role='analyst',false)
+    on conflict(user_id,module) do update set
+      can_view=excluded.can_view, can_create=excluded.can_create,
+      can_update=excluded.can_update, can_delete=excluded.can_delete,
+      updated_at=now();
+  end if;
+  return new;
 end $$;
-revoke all on function public.complete_required_password_change() from public,anon;
-grant execute on function public.complete_required_password_change() to authenticated;
+drop trigger if exists on_profile_role_permissions_changed on public.profiles;
+create trigger on_profile_role_permissions_changed after update of role on public.profiles
+for each row execute function public.sync_changed_role_permissions();
 
 commit;

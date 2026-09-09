@@ -16,6 +16,15 @@ CREATE TABLE IF NOT EXISTS public.projects (
 
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 
+-- Debe existir antes de crear las políticas de projects que la consultan.
+CREATE TABLE IF NOT EXISTS public.project_members (
+  project_id  UUID        NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role        TEXT        NOT NULL CHECK (role IN ('owner','admin','editor','viewer')),
+  joined_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, user_id)
+);
+
 -- Solo pueden VER los proyectos aquellos que sean miembros
 CREATE POLICY "Miembros pueden ver su proyecto"
   ON public.projects FOR SELECT

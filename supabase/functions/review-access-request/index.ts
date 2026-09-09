@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, json } from '../_shared/http.ts'
 import { sendEmail } from '../_shared/resend.ts'
+import { findAuthUserByEmail } from '../_shared/auth-users.ts'
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok',{headers:corsHeaders})
@@ -19,7 +20,7 @@ Deno.serve(async (request) => {
       const {data:updated,error}=await admin.from('access_requests').update({status:'rejected',reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',requestId).eq('status','pending').select('id').maybeSingle(); if(error||!updated)return json({error:'La solicitud cambió mientras se procesaba.'},409)
       await sendEmail(accessRequest.email,'Solicitud de acceso a Kargia',`<p>Hola ${accessRequest.first_name},</p><p>Tu solicitud de acceso fue rechazada.</p>`).catch(()=>undefined); return json({ok:true})
     }
-    const {data:profiles}=await admin.from('profiles').select('id').ilike('email',accessRequest.email).limit(1); if(profiles?.length)return json({error:'El correo ya corresponde a un usuario.'},409)
+    const [authUser,{data:profiles}]=await Promise.all([findAuthUserByEmail(admin,accessRequest.email),admin.from('profiles').select('id').ilike('email',accessRequest.email).limit(1)]); if(authUser||profiles?.length)return json({error:'El correo ya corresponde a un usuario.'},409)
     const {data:created,error:createError}=await admin.auth.admin.createUser({email:accessRequest.email,password:temporaryPassword,email_confirm:true,user_metadata:{full_name:`${accessRequest.first_name} ${accessRequest.last_name}`,role:'worker'}})
     if(createError||!created.user)return json({error:createError?.message??'No se pudo crear la cuenta.'},400)
     const {error:profileError}=await admin.from('profiles').upsert({id:created.user.id,email:accessRequest.email,full_name:`${accessRequest.first_name} ${accessRequest.last_name}`,role:'worker',must_change_password:true})

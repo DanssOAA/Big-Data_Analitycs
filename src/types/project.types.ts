@@ -1,11 +1,4 @@
-/**
- * Roles dentro de un proyecto (equivalente a GitHub repo roles).
- *
- * owner  – creador del proyecto, permisos totales, puede eliminarlo
- * admin  – puede invitar / quitar miembros y editar datasets
- * editor – puede subir y editar datasets, NO puede gestionar miembros
- * viewer – solo lectura, no puede modificar nada
- */
+/** La membresía no tiene roles internos; las capacidades vienen del perfil y user_permissions. */
 export interface ProjectMember {
   userId: string
   email: string

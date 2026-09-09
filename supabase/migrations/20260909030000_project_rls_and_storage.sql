@@ -5,7 +5,7 @@ revoke all on function public.is_project_member(uuid),public.has_project_permiss
 grant execute on function public.is_project_member(uuid),public.has_project_permission(uuid,text,text) to authenticated,service_role;
 
 do $$ declare t text; p record; begin
-  foreach t in array array['projects','project_members','clients','sales','products','shipments','activities','documents','datasets','dataset_tables','dataset_rows','insights'] loop
+  foreach t in array array['projects','project_members','profiles','clients','sales','products','shipments','activities','documents','datasets','dataset_tables','dataset_rows','insights'] loop
     execute format('alter table public.%I enable row level security',t);
     for p in select policyname from pg_policies where schemaname='public' and tablename=t loop execute format('drop policy if exists %I on public.%I',p.policyname,t); end loop;
   end loop;
@@ -18,6 +18,8 @@ create policy projects_admin_delete on public.projects for delete to authenticat
 create policy members_read on public.project_members for select to authenticated using(public.is_admin() or user_id=(select auth.uid()));
 create policy members_admin_insert on public.project_members for insert to authenticated with check(public.is_admin());
 create policy members_admin_delete on public.project_members for delete to authenticated using(public.is_admin());
+create policy profiles_read_self_or_admin on public.profiles for select to authenticated using(id=(select auth.uid()) or public.is_admin());
+create policy profiles_admin_update on public.profiles for update to authenticated using(public.is_admin()) with check(public.is_admin());
 
 do $$ declare pair text[]; begin foreach pair slice 1 in array array[['clients','clients'],['sales','sales'],['products','products'],['shipments','shipments'],['activities','activities'],['documents','documentation'],['datasets','datasets']] loop
  execute format('create policy scoped_read on public.%I for select to authenticated using(public.has_project_permission(project_id,%L,''view''))',pair[1],pair[2]);
@@ -36,7 +38,13 @@ create policy dataset_rows_update on public.dataset_rows for update to authentic
 create policy dataset_rows_delete on public.dataset_rows for delete to authenticated using(exists(select 1 from public.dataset_tables dt join public.datasets d on d.id=dt.dataset_id where dt.id=table_id and public.has_project_permission(d.project_id,'datasets','delete')));
 
 create policy insights_read on public.insights for select to authenticated using(public.is_admin() or (public.has_project_permission(project_id,'insights','view') and ((select role from public.profiles where id=(select auth.uid()))<>'worker' or published)));
-create policy insights_insert on public.insights for insert to authenticated with check(public.has_project_permission(project_id,'insights','create') and created_by=(select auth.uid()) and exists(select 1 from public.datasets d where d.id=dataset_id and d.project_id=insights.project_id));
+create policy insights_insert on public.insights for insert to authenticated with check(
+  public.has_project_permission(project_id,'insights','create')
+  and created_by=(select auth.uid())
+  and exists(select 1 from public.datasets d where d.id=dataset_id and d.project_id=insights.project_id)
+  and (compared_dataset_id is null or exists(select 1 from public.datasets d where d.id=compared_dataset_id and d.project_id=insights.project_id))
+  and (table_id is null or exists(select 1 from public.dataset_tables dt join public.datasets d on d.id=dt.dataset_id where dt.id=table_id and d.id=dataset_id and d.project_id=insights.project_id))
+);
 create policy insights_update on public.insights for update to authenticated using(public.has_project_permission(project_id,'insights','update')) with check(public.has_project_permission(project_id,'insights','update'));
 create policy insights_delete on public.insights for delete to authenticated using(public.has_project_permission(project_id,'insights','delete'));
 
@@ -50,4 +58,9 @@ create policy datasets_storage_insert on storage.objects for insert to authentic
 create policy datasets_storage_delete on storage.objects for delete to authenticated using(bucket_id='datasets' and exists(select 1 from public.datasets d where d.storage_path=name and public.has_project_permission(d.project_id,'datasets','delete')));
 
 do $$ declare p record; begin if to_regclass('public.audit_log') is not null then execute 'alter table public.audit_log enable row level security'; for p in select policyname from pg_policies where schemaname='public' and tablename='audit_log' loop execute format('drop policy if exists %I on public.audit_log',p.policyname); end loop; execute 'create policy audit_admin_read on public.audit_log for select to authenticated using(public.is_admin())'; end if; end $$;
+do $$ begin
+  if to_regprocedure('public.log_document_view(text,text)') is not null then
+    execute 'revoke execute on function public.log_document_view(text,text) from authenticated';
+  end if;
+end $$;
 commit;

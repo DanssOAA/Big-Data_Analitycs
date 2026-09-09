@@ -1,88 +1,56 @@
-# React + TypeScript + Vite
+# Kargia
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación React 19 + TypeScript + Vite conectada a Supabase. Kargia organiza CRM, documentación, datasets e insights en **proyectos**: workspaces aislados a los que un administrador asigna usuarios existentes.
 
-Currently, two official plugins are available:
+## Arquitectura de acceso
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+El alta desde la aplicación sigue un único flujo: formulario público → `access_requests` → revisión de un administrador → creación de la cuenta worker con contraseña temporal → cambio obligatorio de contraseña. `Usuarios y permisos` solo gestiona cuentas existentes. No se usa OTP y ninguna contraseña temporal se persiste.
 
-## React Compiler
+Los administradores ven todos los proyectos. Workers y analysts solo ven filas de `project_members`. Toda consulta normal recibe el `activeProject.id`, y RLS vuelve a comprobar membresía y `user_permissions`. Proyectos, Solicitudes y Auditoría son capacidades exclusivas del rol admin.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-## Alta de usuarios desde el panel administrativo
-
-El formulario de **Administración → Usuarios y permisos** utiliza la Edge Function
-`create-user`. Despliégala en el proyecto de Supabase antes de usar el formulario:
+## Desarrollo
 
 ```bash
-supabase functions deploy create-user
+npm install
+npm run dev
+npm run build
+npm run lint
 ```
 
-Supabase proporciona automáticamente `SUPABASE_URL` y
-`SUPABASE_SERVICE_ROLE_KEY` a la función. La clave de servicio nunca debe añadirse
-a las variables `VITE_*` ni exponerse en el navegador. La función valida la sesión
-y comprueba en `profiles` que el solicitante tenga el rol `admin`.
+Variables públicas del frontend:
+
+```env
+VITE_SUPABASE_URL=https://PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=...
+VITE_GEMINI_API_KEY=... # integración actual de IA
+```
+
+Nunca añadas `SUPABASE_SERVICE_ROLE_KEY` ni `RESEND_API_KEY` a variables `VITE_*`.
+
+## Despliegue de Supabase y Resend
+
+Aplica las migraciones en orden después de probarlas en staging. La migración de workspaces aborta si no existe un perfil admin y crea `Proyecto General` para el backfill antes de imponer `NOT NULL`.
+
+```bash
+supabase link --project-ref PROJECT_REF
+supabase db push
+supabase secrets set RESEND_API_KEY=re_xxx
+supabase secrets set RESEND_FROM_EMAIL="Kargia <acceso@tu-dominio.com>"
+supabase secrets set APP_URL=https://app.tu-dominio.com
+supabase functions deploy request-access --no-verify-jwt
+supabase functions deploy review-access-request
+supabase functions delete create-user
+```
+
+Supabase inyecta `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en Edge Functions. `request-access` es pública; `review-access-request` exige JWT y vuelve a comprobar `profiles.role = 'admin'`.
+
+En Resend, verifica el dominio de `RESEND_FROM_EMAIL` y configura SPF/DKIM. Los avisos se envían individualmente a cada admin para no revelar destinatarios.
+
+## Migraciones nuevas
+
+1. `20260909010000_access_requests_and_permissions.sql`: solicitudes, cambio obligatorio y matriz de permisos.
+2. `20260909020000_project_workspaces_and_backfill.sql`: membresías simples, Proyecto General, backfill y constraints.
+3. `20260909030000_project_rls_and_storage.sql`: helpers RLS, aislamiento de tablas y Storage, Auditoría admin-only.
+4. `20260909040000_drop_documentation_projects.sql`: elimina el subsistema antiguo de proyectos de documentación.
+
+No ejecutes una migración destructiva directamente en producción. Revisa primero el proyecto enlazado con `supabase projects list` y valida en staging. La eliminación de proyectos comerciales solo funciona si el proyecto está vacío.
